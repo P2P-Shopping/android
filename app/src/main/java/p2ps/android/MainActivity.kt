@@ -25,12 +25,15 @@ import p2ps.android.ui.theme.P2PSAndroidTheme
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show()
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+
+        if (fineGranted || coarseGranted) {
+            Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "Location permission denied. GPS is required for this app", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -51,14 +54,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkLocationPermission() {
-        when {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                    == PackageManager.PERMISSION_GRANTED -> {
-            }
-            else -> {
-                requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-        }
+        val fineGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (fineGranted || coarseGranted) return
+
+        requestPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
 }
 

@@ -64,8 +64,10 @@ class MainActivity : ComponentActivity() {
             this, Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
-        if (fineGranted || coarseGranted) return
-
+        if (fineGranted || coarseGranted) {
+            sendResultToWeb("Granted")
+            return
+        }
         requestPermissionLauncher.launch(
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,

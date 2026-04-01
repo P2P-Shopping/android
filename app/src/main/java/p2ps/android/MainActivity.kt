@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val webInterface = WebAppInterface()
+        checkLocationPermission()
 
         enableEdgeToEdge()
         setContent {

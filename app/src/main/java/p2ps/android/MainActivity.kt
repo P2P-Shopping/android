@@ -3,6 +3,7 @@ package p2ps.android
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.webkit.JavascriptInterface
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,14 +33,17 @@ class MainActivity : ComponentActivity() {
 
         if (fineGranted || coarseGranted) {
             Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
+            sendResultToWeb("Granted")
         } else {
             Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
+            sendResultToWeb("Denied")
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val webInterface = WebAppInterface()
         checkLocationPermission()
 
         enableEdgeToEdge()
@@ -61,14 +65,29 @@ class MainActivity : ComponentActivity() {
             this, Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
-        if (fineGranted || coarseGranted) return
-
+        if (fineGranted || coarseGranted) {
+            sendResultToWeb("Granted")
+            return
+        }
         requestPermissionLauncher.launch(
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION
             )
         )
+    }
+
+    private fun sendResultToWeb(result: String) {
+        println("Bridge Result: $result")
+    }
+
+    inner class WebAppInterface {
+        @JavascriptInterface
+        fun requestLocationPermission() {
+            runOnUiThread {
+                checkLocationPermission()
+            }
+        }
     }
 }
 

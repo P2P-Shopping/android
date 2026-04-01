@@ -1,5 +1,4 @@
 <resources>
     <string name="app_name">P2P Shopping</string>
     <string name="location_permission_granted">Location permission granted</string>
-    <string name="location_permission_denied">Location permission denied. GPS is required for this app</string>
-</resources>
+    <string name="location_permission_denied">Location permission is required for this feature.</string></resources>

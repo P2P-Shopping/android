@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">p2ps-android</string>
+    <string name="app_name">P2P Shopping</string>
+    <string name="location_permission_granted">Location permission granted</string>
+    <string name="location_permission_denied">Location permission denied. GPS is required for this app</string>
 </resources>

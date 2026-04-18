@@ -25,6 +25,7 @@ import p2ps.android.ui.theme.P2PSAndroidTheme
 
 class MainActivity : ComponentActivity() {
 
+    private val hardwareManager = HardwareManager()
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -42,6 +43,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        hardwareManager.initialize()
 
         val webInterface = WebAppInterface()
         checkLocationPermission()

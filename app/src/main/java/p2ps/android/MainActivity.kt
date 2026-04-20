@@ -38,11 +38,14 @@ class MainActivity : ComponentActivity() {
         if (fineGranted || coarseGranted) {
             Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
             sendResultToWeb("Granted")
+            savePing("OnPermissionGranted")
 
         } else {
             Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
             sendResultToWeb("Denied")
+
         }
+
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,6 +79,18 @@ class MainActivity : ComponentActivity() {
         )
         telemetryManager.savePing(ping)
     }
+    private fun savePing(trigger: String) {
+        val ping = TelemetryPing(
+            storeId = "Store_001",
+            itemId = "Item_99",
+            triggerType = trigger,
+            timestamp = System.currentTimeMillis(),
+            lat = 44.4268,
+            long = 26.1025,
+            accuracy = 10.0f
+        )
+        telemetryManager.savePing(ping)
+    }
     private fun checkLocationPermission() {
         val fineGranted = ContextCompat.checkSelfPermission(
             this, Manifest.permission.ACCESS_FINE_LOCATION
@@ -86,6 +101,7 @@ class MainActivity : ComponentActivity() {
 
         if (fineGranted || coarseGranted) {
             sendResultToWeb("Granted")
+            savePing("OnPermissionGranted")
             return
         }
         requestPermissionLauncher.launch(

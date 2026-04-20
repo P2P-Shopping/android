@@ -5,6 +5,9 @@ class HardwareManager {
     private val TAG = "HardwareManager"
     private var isInitialized = false
 
+    private val locationBridge = NativeLocationBridge()
+    private val apiClient = ApiClient()
+
     // 1. Inițializarea SDK-ului
     fun initialize() {
         if (isInitialized) return
@@ -41,7 +44,7 @@ class HardwareManager {
         Log.d(TAG, "Hardware Event: Sending location ping")
     }
 
-    // Task #149
+    //Trigger-ul principal
     fun handleHardwareTrigger(storeId: String, itemId: String, triggerType: String = "BUTTON_PRESS") {
         if (!isInitialized) {
             Log.e(TAG, "Trigger failed: Hardware not initialized.")
@@ -57,7 +60,6 @@ class HardwareManager {
             "timestamp" to System.currentTimeMillis()
         )
 
-        //Logăm doar cheile, nu valorile sensibile, și doar în Debug
         if (javaClass.desiredAssertionStatus()) {
             Log.d(TAG, "Raw data extracted: keys=${rawData.keys}")
         }
@@ -66,8 +68,18 @@ class HardwareManager {
     }
 
     private fun dispatchTelemetry(data: Map<String, Any>) {
-        //Folosim parametrul 'data' pentru a extrage cheile în log
-        // TODO(#149): replace with real telemetry dispatcher injection
-        Log.i(TAG, "Telemetry data dispatched to dispatcher flow: keys=${data.keys}")
+        //Preluam locația
+        val locationData = locationBridge.getAccurateLocation()
+
+        // Construim DTO-ul complet
+        val fullTelemetryDto = data.toMutableMap()
+        fullTelemetryDto.putAll(locationData)
+
+        // Trimitem ping-ul cu toate datele colectate
+        apiClient.sendPing(fullTelemetryDto)
+
+        if (javaClass.desiredAssertionStatus()) {
+            Log.i(TAG, "Telemetry flow completed for: keys=${fullTelemetryDto.keys}")
+        }
     }
 }

@@ -50,21 +50,24 @@ class HardwareManager {
 
         Log.i(TAG, "Hardware Trigger Detected!")
 
-        // Extragerea raw data
         val rawData = mapOf(
-            "storeId" to storeId,         // locația fizică a evenimentului
-            "itemId" to itemId,           // Identifică produsul interacționat
-            "triggerType" to triggerType, // Definește modul de activare (pentru analiza comportamentului utilizatorului)
-            "timestamp" to System.currentTimeMillis() // Momentul exact al producerii (pentru sincronizarea datelor offline)
+            "storeId" to storeId,
+            "itemId" to itemId,
+            "triggerType" to triggerType,
+            "timestamp" to System.currentTimeMillis()
         )
 
-        Log.d(TAG, "Raw data extracted: $rawData")
+        //Logăm doar cheile, nu valorile sensibile, și doar în Debug
+        if (javaClass.desiredAssertionStatus()) {
+            Log.d(TAG, "Raw data extracted: keys=${rawData.keys}")
+        }
 
         dispatchTelemetry(rawData)
     }
 
     private fun dispatchTelemetry(data: Map<String, Any>) {
-        // Simulează trimiterea datelor către fluxul de telemetrie
-        Log.i(TAG, "Telemetry data dispatched to dispatcher flow.")
+        //Folosim parametrul 'data' pentru a extrage cheile în log
+        // TODO(#149): replace with real telemetry dispatcher injection
+        Log.i(TAG, "Telemetry data dispatched to dispatcher flow: keys=${data.keys}")
     }
 }

@@ -40,4 +40,31 @@ class HardwareManager {
         }
         Log.d(TAG, "Hardware Event: Sending location ping")
     }
+
+    // Task #149
+    fun handleHardwareTrigger(storeId: String, itemId: String, triggerType: String = "BUTTON_PRESS") {
+        if (!isInitialized) {
+            Log.e(TAG, "Trigger failed: Hardware not initialized.")
+            return
+        }
+
+        Log.i(TAG, "Hardware Trigger Detected!")
+
+        // Extragerea raw data
+        val rawData = mapOf(
+            "storeId" to storeId,         // locația fizică a evenimentului
+            "itemId" to itemId,           // Identifică produsul interacționat
+            "triggerType" to triggerType, // Definește modul de activare (pentru analiza comportamentului utilizatorului)
+            "timestamp" to System.currentTimeMillis() // Momentul exact al producerii (pentru sincronizarea datelor offline)
+        )
+
+        Log.d(TAG, "Raw data extracted: $rawData")
+
+        dispatchTelemetry(rawData)
+    }
+
+    private fun dispatchTelemetry(data: Map<String, Any>) {
+        // Simulează trimiterea datelor către fluxul de telemetrie
+        Log.i(TAG, "Telemetry data dispatched to dispatcher flow.")
+    }
 }

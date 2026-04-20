@@ -46,6 +46,12 @@ class MainActivity : ComponentActivity() {
 
         hardwareManager.initialize()
 
+        hardwareManager.handleHardwareTrigger(
+            storeId = "Lidl_01",
+            itemId = "Mere_Golden_05",
+            triggerType = "SCAN_BUTTON"
+        )
+
         val webInterface = WebAppInterface()
         checkLocationPermission()
 

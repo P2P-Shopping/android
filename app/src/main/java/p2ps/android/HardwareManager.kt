@@ -41,7 +41,13 @@ class HardwareManager {
             Log.e(TAG, "Cannot send ping: Hardware not initialized.")
             return
         }
-        Log.d(TAG, "Hardware Event: Sending location ping")
+        val pingData = mapOf(
+            "lat" to lat,
+            "lng" to lng,
+            "timestamp" to System.currentTimeMillis(),
+            "type" to "MANUAL_PING"
+        )
+        apiClient.sendPing(pingData)
     }
 
     //Trigger-ul principal
@@ -68,18 +74,15 @@ class HardwareManager {
     }
 
     private fun dispatchTelemetry(data: Map<String, Any>) {
-        //Preluam locația
-        val locationData = locationBridge.getAccurateLocation()
+        try {
+            val locationData = locationBridge.getAccurateLocation()
+            val fullTelemetryDto = data.toMutableMap()
+            fullTelemetryDto.putAll(locationData)
 
-        // Construim DTO-ul complet
-        val fullTelemetryDto = data.toMutableMap()
-        fullTelemetryDto.putAll(locationData)
-
-        // Trimitem ping-ul cu toate datele colectate
-        apiClient.sendPing(fullTelemetryDto)
-
-        if (javaClass.desiredAssertionStatus()) {
-            Log.i(TAG, "Telemetry flow completed for: keys=${fullTelemetryDto.keys}")
+            apiClient.sendPing(fullTelemetryDto)
+        } catch (e: Exception) {
+            Log.e(TAG, "Telemetry flow failed: ${e.message}")
+            // Aici s-ar putea adăuga o logică de retry sau salvare locală în DB (#37)
         }
     }
 }

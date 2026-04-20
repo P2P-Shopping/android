@@ -46,15 +46,6 @@ class MainActivity : ComponentActivity() {
 
         hardwareManager.initialize()
 
-        if (savedInstanceState == null) {
-            // TODO(#149): remove once the real hardware trigger listener is wired up.
-            hardwareManager.handleHardwareTrigger(
-                storeId = "Lidl_01",
-                itemId = "Mere_Golden_05",
-                triggerType = "SCAN_BUTTON"
-            )
-        }
-
         val webInterface = WebAppInterface()
         checkLocationPermission()
 

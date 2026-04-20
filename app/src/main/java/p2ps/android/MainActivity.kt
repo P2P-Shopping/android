@@ -22,8 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import p2ps.android.ui.theme.P2PSAndroidTheme
+import p2ps.android.data.TelemetryPing
+import p2ps.android.data.TelemetryManager
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var telemetryManager: TelemetryManager
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -34,6 +38,7 @@ class MainActivity : ComponentActivity() {
         if (fineGranted || coarseGranted) {
             Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
             sendResultToWeb("Granted")
+
         } else {
             Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
             sendResultToWeb("Denied")
@@ -42,6 +47,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        telemetryManager = TelemetryManager(this)
 
         val webInterface = WebAppInterface()
         checkLocationPermission()
@@ -56,7 +63,19 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    private fun saveExamplePing() {
 
+        val ping = TelemetryPing(
+            storeId = "Store_Test_01",
+            itemId = "Item_Test_01",
+            triggerType = "LocationUpdate",
+            timestamp = System.currentTimeMillis(),
+            lat = 44.4268,
+            long = 26.1025,
+            accuracy = 5.0f
+        )
+        telemetryManager.savePing(ping)
+    }
     private fun checkLocationPermission() {
         val fineGranted = ContextCompat.checkSelfPermission(
             this, Manifest.permission.ACCESS_FINE_LOCATION

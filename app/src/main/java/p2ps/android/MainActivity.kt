@@ -22,9 +22,9 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import p2ps.android.ui.theme.P2PSAndroidTheme
-import p2ps.android.data.TelemetryPing
 import p2ps.android.data.TelemetryManager
+import p2ps.android.data.TelemetryPing
+import p2ps.android.ui.theme.P2PSAndroidTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val hardwareManager = HardwareManager()
 
+    // Handles permissions and UI/State updates ONLY.
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
 
         if (fineGranted || coarseGranted) {
             Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
+            sendResultToWeb("Granted")
         } else {
             Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
         }
@@ -88,7 +90,10 @@ class MainActivity : ComponentActivity() {
             this, Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
-        if (fineGranted || coarseGranted) return
+        if (fineGranted || coarseGranted) {
+            sendResultToWeb("Granted")
+            return
+        }
 
         requestPermissionLauncher.launch(
             arrayOf(
@@ -98,6 +103,10 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    /**
+     * Entry point for the hardware trigger.
+     * Builds the exact JSON-mapped payload after fetching real GPS data.
+     */
     @SuppressLint("MissingPermission")
     fun onHardwareTriggerReceived(storeId: String, itemId: String, deviceId: String = "usr_DEMO", triggerType: String = "HARDWARE") {
         val hasFineLocation = ContextCompat.checkSelfPermission(
@@ -108,10 +117,12 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
 
         if (!hasFineLocation && !hasCoarseLocation) {
+            println("Telemetry Error: Cannot trigger ping, location permissions are missing.")
             Toast.makeText(this, "Location permission missing for telemetry", Toast.LENGTH_SHORT).show()
             return
         }
 
+        // Fetch the most accurate current location
         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
             .addOnSuccessListener { location ->
                 if (location != null) {
@@ -135,8 +146,24 @@ class MainActivity : ComponentActivity() {
                     runOnUiThread {
                         Toast.makeText(this, "Telemetry processed: ${location.latitude}, ${location.longitude}", Toast.LENGTH_SHORT).show()
                     }
+                    println("Telemetry Success: Ping saved for device $deviceId")
+                } else {
+                    println("Telemetry Error: Location returned null.")
+                    runOnUiThread {
+                        Toast.makeText(this, "Error: Location is null", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
+            .addOnFailureListener { exception ->
+                println("Telemetry Error: Failed to retrieve location - ${exception.localizedMessage}")
+                runOnUiThread {
+                    Toast.makeText(this, "Error: ${exception.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
+            }
+    }
+
+    private fun sendResultToWeb(result: String) {
+        println("Bridge Result: $result")
     }
 
     inner class WebAppInterface {

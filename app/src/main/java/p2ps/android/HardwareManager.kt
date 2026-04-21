@@ -35,6 +35,7 @@ class HardwareManager {
 
     /**
      * Handles the hardware trigger by dispatching the ping to the backend.
+     * Task #149
      * Note: Location is now passed from the caller to ensure freshness and permissions.
      */
     fun handleHardwareTrigger(ping: TelemetryPing) {
@@ -45,5 +46,10 @@ class HardwareManager {
 
         Log.i(TAG, "Hardware Trigger Detected for item: ${ping.itemId}")
         apiClient.sendPing(ping)
+    }
+
+    // Deprecated raw trigger for backward compatibility or direct simulation without location
+    fun handleHardwareTrigger(storeId: String, itemId: String, triggerType: String = "BUTTON_PRESS") {
+        Log.w(TAG, "Manual trigger received without location. Pings should be created via MainActivity.")
     }
 }

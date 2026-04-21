@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private val hardwareManager = HardwareManager() // Adus din ramura main
+    private val hardwareManager = HardwareManager()
 
     // Handles permissions and UI/State updates ONLY.
     private val requestPermissionLauncher = registerForActivityResult(
@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
 
         if (fineGranted || coarseGranted) {
             Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
-            sendResultToWeb("Granted") // Adus din ramura SavePing
+            sendResultToWeb("Granted")
         } else {
             Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
         }
@@ -53,9 +53,19 @@ class MainActivity : ComponentActivity() {
         telemetryManager = TelemetryManager(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         
-        hardwareManager.initialize() // Adus din ramura main
+        // Initialize Hardware SDK
+        hardwareManager.initialize()
 
         checkLocationPermission()
+
+        if (savedInstanceState == null) {
+            // Task #149: Simulation of a startup hardware trigger
+            onHardwareTriggerReceived(
+                storeId = "Lidl_01",
+                itemId = "Mere_Golden_05",
+                triggerType = "STARTUP_AUTO_SCAN"
+            )
+        }
 
         enableEdgeToEdge()
         setContent {
@@ -81,7 +91,7 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
 
         if (fineGranted || coarseGranted) {
-            sendResultToWeb("Granted") // Adus din ramura SavePing
+            sendResultToWeb("Granted")
             return
         }
 
@@ -108,7 +118,7 @@ class MainActivity : ComponentActivity() {
 
         if (!hasFineLocation && !hasCoarseLocation) {
             println("Telemetry Error: Cannot trigger ping, location permissions are missing.")
-            Toast.makeText(this, "Location permission missing for ping", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Location permission missing for telemetry", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -127,12 +137,14 @@ class MainActivity : ComponentActivity() {
                         timestamp = System.currentTimeMillis()
                     )
                     
-                    // Logica combinată: salvăm local și trimitem către managerul hardware
+                    // 1. Save locally via existing TelemetryManager
                     telemetryManager.savePing(ping)
+                    
+                    // 2. Delegate to HardwareManager flow from Task #149
                     hardwareManager.handleHardwareTrigger(ping)
 
                     runOnUiThread {
-                        Toast.makeText(this, "Ping processed: ${location.latitude}, ${location.longitude}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Telemetry processed: ${location.latitude}, ${location.longitude}", Toast.LENGTH_SHORT).show()
                     }
                     println("Telemetry Success: Ping saved for device $deviceId")
                 } else {

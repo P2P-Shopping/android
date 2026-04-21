@@ -12,12 +12,13 @@ class TelemetryManager(context: Context) {
         val editor = prefs.edit()
 
         val dataString = JSONObject()
+            .put("deviceId", ping.deviceId)
             .put("storeId", ping.storeId)
             .put("itemId", ping.itemId)
             .put("triggerType", ping.triggerType)
             .put("timestamp", ping.timestamp)
             .put("lat", ping.lat)
-            .put("longitude", ping.long)
+            .put("lng", ping.lng)
             .put("accuracy", ping.accuracy)
             .toString()
 

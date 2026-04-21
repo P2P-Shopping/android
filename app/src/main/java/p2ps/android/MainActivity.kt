@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private val hardwareManager = HardwareManager() // Adus din ramura main
 
     // Handles permissions and UI/State updates ONLY.
     private val requestPermissionLauncher = registerForActivityResult(
@@ -40,10 +41,9 @@ class MainActivity : ComponentActivity() {
 
         if (fineGranted || coarseGranted) {
             Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
-            sendResultToWeb("Granted")
+            sendResultToWeb("Granted") // Adus din ramura SavePing
         } else {
             Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
-            sendResultToWeb("Denied")
         }
     }
 
@@ -52,6 +52,8 @@ class MainActivity : ComponentActivity() {
 
         telemetryManager = TelemetryManager(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        
+        hardwareManager.initialize() // Adus din ramura main
 
         checkLocationPermission()
 
@@ -79,7 +81,7 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
 
         if (fineGranted || coarseGranted) {
-            sendResultToWeb("Granted")
+            sendResultToWeb("Granted") // Adus din ramura SavePing
             return
         }
 
@@ -106,6 +108,7 @@ class MainActivity : ComponentActivity() {
 
         if (!hasFineLocation && !hasCoarseLocation) {
             println("Telemetry Error: Cannot trigger ping, location permissions are missing.")
+            Toast.makeText(this, "Location permission missing for ping", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -123,9 +126,13 @@ class MainActivity : ComponentActivity() {
                         accuracy = location.accuracy,
                         timestamp = System.currentTimeMillis()
                     )
+                    
+                    // Logica combinată: salvăm local și trimitem către managerul hardware
                     telemetryManager.savePing(ping)
+                    hardwareManager.handleHardwareTrigger(ping)
+
                     runOnUiThread {
-                        Toast.makeText(this, "Ping saved: ${location.latitude}, ${location.longitude}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Ping processed: ${location.latitude}, ${location.longitude}", Toast.LENGTH_SHORT).show()
                     }
                     println("Telemetry Success: Ping saved for device $deviceId")
                 } else {
@@ -150,9 +157,7 @@ class MainActivity : ComponentActivity() {
     inner class WebAppInterface {
         @JavascriptInterface
         fun requestLocationPermission() {
-            runOnUiThread {
-                checkLocationPermission()
-            }
+            runOnUiThread { checkLocationPermission() }
         }
     }
 }

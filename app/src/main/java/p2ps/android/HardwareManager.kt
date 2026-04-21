@@ -3,6 +3,9 @@ package p2ps.android
 import android.util.Log
 import p2ps.android.data.TelemetryPing
 
+/**
+ * Manages interactions with physical hardware and coordinates telemetry dispatch.
+ */
 class HardwareManager {
     private val TAG = "HardwareManager"
     private var isInitialized = false

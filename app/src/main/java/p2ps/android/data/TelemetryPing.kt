@@ -1,7 +1,7 @@
 package p2ps.android.data
 
 /**
- * Unified Data Class for Telemetry.
+ * Data class representing the telemetry data packet.
  * Matches the required backend JSON schema.
  */
 data class TelemetryPing(

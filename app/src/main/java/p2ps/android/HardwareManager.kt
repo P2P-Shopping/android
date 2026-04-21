@@ -36,6 +36,7 @@ class HardwareManager {
     /**
      * Handles the hardware trigger by dispatching the ping to the backend.
      * Task #149
+     * Note: Location is now passed from the caller to ensure freshness and permissions.
      */
     fun handleHardwareTrigger(ping: TelemetryPing) {
         if (!isInitialized) {

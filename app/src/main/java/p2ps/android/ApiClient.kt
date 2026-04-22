@@ -28,9 +28,9 @@ class ApiClient {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    // Matching exactly what works in Postman
-                    .addHeader("X-API-Key", "megasuperhyperduperultrasecretAPIkeypassword")
-                    .addHeader("X-Device-Id", "megasuperhyperduperultrasecretAPIkeypassword")
+                    // Matching exactly what works in Postman, using BuildConfig for security
+                    .addHeader("X-API-Key", BuildConfig.API_KEY)
+                    .addHeader("X-Device-Id", BuildConfig.API_KEY)
                     .build()
                 chain.proceed(request)
             }

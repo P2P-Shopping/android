@@ -12,15 +12,16 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 class ApiClient {
-    private val TAG = "ApiClient"
-
-    private val BASE_URL = "http://10.0.2.2:8081/api/"
+    companion object {
+        private const val TAG = "ApiClient"
+        private const val BASE_URL = "http://10.0.2.2:8081/api/"
+    }
 
     private val apiService: ApiService
 
     init {
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         }
 
         // We add the Header interceptor FIRST, and Logging LAST

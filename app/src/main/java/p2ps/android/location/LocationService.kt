@@ -11,6 +11,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import android.content.pm.ServiceInfo
 import android.os.Build
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
 import com.google.android.gms.location.*
 import p2ps.android.R
 import java.util.concurrent.TimeUnit
@@ -26,6 +29,10 @@ class LocationService : Service() {
     private val NOTIFICATION_ID = 12345
 
     private lateinit var telemetryManager: TelemetryManager
+
+    private var currentDeviceId = "unknown"
+    private var currentStoreId = "unknown"
+    private var currentItemId = "unknown"
 
     override fun onCreate() {
         super.onCreate()
@@ -66,8 +73,8 @@ class LocationService : Service() {
         android.util.Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
         val ping = TelemetryPing(
             deviceId = "usr_DEMO",
-            storeId = "Lidl_01",
-            itemId = "Background_Track",
+            storeId = currentStoreId,
+            itemId = currentItemId,
             triggerType = "BACKGROUND",
             lat = location.latitude,
             lng = location.longitude,
@@ -96,8 +103,17 @@ class LocationService : Service() {
             .build()
     }
 
-    @SuppressLint("ForegroundServiceType")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        intent?.let {
+            currentDeviceId = it.getStringExtra("EXTRA_DEVICE_ID") ?: "unknown"
+            currentStoreId = it.getStringExtra("EXTRA_STORE_ID") ?: "unknown"
+            currentItemId = it.getStringExtra("EXTRA_ITEM_ID") ?: "unknown"
+        }
         val notification = createNotification()
 
         ServiceCompat.startForeground(

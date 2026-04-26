@@ -192,7 +192,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startLocationTrackingService() {
-        val intent = android.content.Intent(this, p2ps.android.location.LocationService::class.java)
+        val intent = android.content.Intent(this, p2ps.android.location.LocationService::class.java).apply {
+            putExtra("EXTRA_DEVICE_ID", "usr_DEMO")
+            putExtra("EXTRA_STORE_ID", "Lidl_01")
+            putExtra("EXTRA_ITEM_ID", "Background_Track")
+        }
         startForegroundService(intent)
     }
 }

@@ -5,14 +5,18 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.location.Location
-import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import android.content.pm.ServiceInfo
+import android.os.Build
 import com.google.android.gms.location.*
 import p2ps.android.R
 import java.util.concurrent.TimeUnit
 import p2ps.android.MainActivity
+import p2ps.android.data.TelemetryManager
+import p2ps.android.data.TelemetryPing
 
 class LocationService : Service() {
 
@@ -21,8 +25,12 @@ class LocationService : Service() {
     private val CHANNEL_ID = "location_tracking_channel"
     private val NOTIFICATION_ID = 12345
 
+    private lateinit var telemetryManager: TelemetryManager
+
     override fun onCreate() {
         super.onCreate()
+
+        telemetryManager = TelemetryManager(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         locationCallback = object : LocationCallback() {
@@ -35,7 +43,6 @@ class LocationService : Service() {
 
         createNotificationChannel()
     }
-
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
@@ -57,6 +64,17 @@ class LocationService : Service() {
 
     private fun processNewLocation(location: Location) {
         android.util.Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
+        val ping = TelemetryPing(
+            deviceId = "usr_DEMO",
+            storeId = "Lidl_01",
+            itemId = "Background_Track",
+            triggerType = "BACKGROUND",
+            lat = location.latitude,
+            lng = location.longitude,
+            accuracy = location.accuracy,
+            timestamp = System.currentTimeMillis()
+        )
+        telemetryManager.savePing(ping)
 
 
     }
@@ -80,10 +98,16 @@ class LocationService : Service() {
 
     @SuppressLint("ForegroundServiceType")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // 1. Creăm notificarea
         val notification = createNotification()
 
-        startForeground(NOTIFICATION_ID, notification)
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            notification,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else 0
+        )
 
         startLocationUpdates()
 
@@ -102,9 +126,6 @@ class LocationService : Service() {
                 description = "Background location tracking for telemetry"
                 setShowBadge(true) //bulina aplicatie
             }
-
-            // 2. Îl înregistrăm în sistem
-            // Dacă există deja, Android nu face nimic (deci e safe)
             manager.createNotificationChannel(channel)
         }
     }
@@ -115,4 +136,6 @@ class LocationService : Service() {
         super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
+
+
 }

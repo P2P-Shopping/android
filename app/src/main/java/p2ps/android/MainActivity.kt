@@ -43,6 +43,13 @@ class MainActivity : ComponentActivity() {
 
         if (fineGranted) {
             Toast.makeText(this, "Location access granted!", Toast.LENGTH_SHORT).show()
+            startLocationTrackingService()
+
+            onHardwareTriggerReceived(
+                storeId = "Lidl_01",
+                itemId = "Mere_Golden_05",
+                triggerType = "STARTUP_AUTO_SCAN"
+            )
             if (!notificationsGranted) {
                 Toast.makeText(this, "Notifications disabled. Service will run silently.", Toast.LENGTH_LONG).show()
             }
@@ -65,16 +72,6 @@ class MainActivity : ComponentActivity() {
 
         checkLocationPermission()
 
-
-        if (savedInstanceState == null) {
-            // Task #149: Simulation of a startup hardware trigger
-            onHardwareTriggerReceived(
-                storeId = "Lidl_01",
-                itemId = "Mere_Golden_05",
-                triggerType = "STARTUP_AUTO_SCAN"
-            )
-        }
-
         enableEdgeToEdge()
         setContent {
             P2PSAndroidTheme {
@@ -82,13 +79,18 @@ class MainActivity : ComponentActivity() {
                     WelcomeScreen(
                         onTriggerClick = {
                             val fineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                            val notificationsGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                            } else true
 
-                            if (fineLocation == PackageManager.PERMISSION_GRANTED) {
+                            if (fineLocation == PackageManager.PERMISSION_GRANTED && notificationsGranted) {
                                 onHardwareTriggerReceived("store_ABC", "item_123")
                                 startLocationTrackingService()
                                 Toast.makeText(this, "Telemetry Started", Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(this, "Please allow location to simulate trigger", Toast.LENGTH_SHORT).show()
+                                val message = if (!notificationsGranted) "Notification permission is required for background tracking"
+                                else "Please allow location to simulate trigger"
+                                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                                 checkLocationPermission()
                             }
                         },
@@ -109,15 +111,15 @@ class MainActivity : ComponentActivity() {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        val fineGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-        if (fineGranted) {
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
             sendResultToWeb("Granted")
-
+            startLocationTrackingService()
             return
         }
-
-        requestPermissionLauncher.launch(permissions.toTypedArray())
+        requestPermissionLauncher.launch(missing.toTypedArray())
     }
 
     /**

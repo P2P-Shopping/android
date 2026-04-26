@@ -37,13 +37,20 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        val notificationsGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permissions[Manifest.permission.POST_NOTIFICATIONS] == true
+        } else true
 
-        if (fineGranted || coarseGranted) {
-            Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
+        if (fineGranted) {
+            Toast.makeText(this, "Location access granted!", Toast.LENGTH_SHORT).show()
+            if (!notificationsGranted) {
+                Toast.makeText(this, "Notifications disabled. Service will run silently.", Toast.LENGTH_LONG).show()
+            }
             sendResultToWeb("Granted")
+
         } else {
-            Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Permission denied. Please enable from settings.", Toast.LENGTH_LONG).show()
+            sendResultToWeb("Denied")
         }
     }
 
@@ -57,6 +64,7 @@ class MainActivity : ComponentActivity() {
         hardwareManager.initialize()
 
         checkLocationPermission()
+
 
         if (savedInstanceState == null) {
             // Task #149: Simulation of a startup hardware trigger
@@ -73,7 +81,16 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     WelcomeScreen(
                         onTriggerClick = {
-                            onHardwareTriggerReceived("store_ABC", "item_123")
+                            val fineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+
+                            if (fineLocation == PackageManager.PERMISSION_GRANTED) {
+                                onHardwareTriggerReceived("store_ABC", "item_123")
+                                startLocationTrackingService()
+                                Toast.makeText(this, "Telemetry Started", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(this, "Please allow location to simulate trigger", Toast.LENGTH_SHORT).show()
+                                checkLocationPermission()
+                            }
                         },
                         modifier = Modifier.padding(innerPadding)
                     )
@@ -83,24 +100,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkLocationPermission() {
-        val fineGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+        val permissions = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
 
-        if (fineGranted || coarseGranted) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        val fineGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+        if (fineGranted) {
             sendResultToWeb("Granted")
+
             return
         }
 
-        requestPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
+        requestPermissionLauncher.launch(permissions.toTypedArray())
     }
 
     /**
@@ -118,7 +135,6 @@ class MainActivity : ComponentActivity() {
 
         if (!hasFineLocation && !hasCoarseLocation) {
             println("Telemetry Error: Cannot trigger ping, location permissions are missing.")
-            Toast.makeText(this, "Location permission missing for telemetry", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -171,6 +187,11 @@ class MainActivity : ComponentActivity() {
         fun requestLocationPermission() {
             runOnUiThread { checkLocationPermission() }
         }
+    }
+
+    private fun startLocationTrackingService() {
+        val intent = android.content.Intent(this, p2ps.android.location.LocationService::class.java)
+        startForegroundService(intent)
     }
 }
 

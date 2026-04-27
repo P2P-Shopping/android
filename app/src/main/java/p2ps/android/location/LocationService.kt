@@ -23,6 +23,12 @@ import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.ApiClient
 import p2ps.android.core.TelemetryDispatcher
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 class LocationService : Service() {
 
@@ -37,6 +43,14 @@ class LocationService : Service() {
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
     private var currentItemId = "unknown"
+    private lateinit var sensorManager: SensorManager
+    private var accelerometer: Sensor? = null
+    private var isMoving = true
+    private var lastMoveTime = 0L
+    private val INTERVAL_MOVING = 5000L      // 5 secunde
+    private val INTERVAL_STATIONARY = 30000L  // 30 secunde
+    private var currentInterval = 0L
+
 
     override fun onCreate() {
         super.onCreate()
@@ -55,13 +69,24 @@ class LocationService : Service() {
         }
 
         createNotificationChannel()
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        accelerometer?.let {
+            sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
     }
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
-            TimeUnit.SECONDS.toMillis(10)
+            currentInterval // 5000L când te miști
         ).apply {
-            setMinUpdateIntervalMillis(TimeUnit.SECONDS.toMillis(5))
+            // Îi spunem sistemului să NU aștepte mai mult de intervalul setat
+            // Asta forțează livrarea ping-ului la timp
+            setMaxUpdateDelayMillis(currentInterval)
+
+            // Setăm intervalul minim egal cu cel actual
+            setMinUpdateIntervalMillis(currentInterval)
         }.build()
 
         try {
@@ -71,8 +96,7 @@ class LocationService : Service() {
                 Looper.getMainLooper()
             )
         } catch (e: SecurityException) {
-            Log.e("LocationService", "Missing location permission at update time", e)
-            stopSelf()
+            Log.e("LocationService", "Missing permissions", e)
         }
     }
 
@@ -156,9 +180,60 @@ class LocationService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private val sensorListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+
+            val magnitude = sqrt((x * x + y * y + z * z).toDouble())
+            // Diferența față de gravitația pământului
+            val acceleration = abs(magnitude - 9.81)
+            val currentTime = System.currentTimeMillis()
+
+            val movingNow = acceleration > 0.5
+
+            if (movingNow) {
+                // Dacă detectăm mișcare, actualizăm timpul ultimei mișcări
+                lastMoveTime = currentTime
+
+                if (!isMoving) {
+                    isMoving = true
+                    Log.d("TelemetryService", "DETECTAT MIȘCARE - Trecem la 5s")
+                    updateLocationInterval()
+                }
+            } else {
+                // Dacă e liniște, așteptăm 2 secunde înainte de a trece la 30s
+                if (isMoving && (currentTime - lastMoveTime > 2000)) {
+                    isMoving = false
+                    Log.d("TelemetryService", "STARE REPAUS - Trecem la 30s")
+                    updateLocationInterval()
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
+    private fun updateLocationInterval() {
+        val newInterval = if (isMoving) INTERVAL_MOVING else INTERVAL_STATIONARY
+
+
+        if (currentInterval == newInterval) return
+
+        // Dacă am ajuns aici, înseamnă că starea s-a schimbat (din mers în stat sau invers)
+        currentInterval = newInterval
+        Log.d("TelemetryService", "Interval SCHIMBAT REAL la: ${currentInterval/1000}s")
+
+        // DOAR ACUM resetăm actualizările, o singură dată la schimbarea stării
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        startLocationUpdates()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallback)
+        sensorManager.unregisterListener(sensorListener)
     }
 
 

@@ -63,7 +63,6 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    implementation("com.google.android.gms:play-services-location:21.2.0")
     testImplementation("io.mockk:mockk:1.13.5")
 
     val room_version = "2.6.1"

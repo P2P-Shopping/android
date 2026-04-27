@@ -47,9 +47,9 @@ class LocationService : Service() {
     private var accelerometer: Sensor? = null
     private var isMoving = true
     private var lastMoveTime = 0L
-    private val INTERVAL_MOVING = 5000L      // 5 secunde
-    private val INTERVAL_STATIONARY = 30000L  // 30 secunde
-    private var currentInterval = 0L
+    private val INTERVAL_MOVING = 5000L
+    private val INTERVAL_STATIONARY = 30000L
+    private var currentInterval = INTERVAL_MOVING
 
 
     override fun onCreate() {
@@ -79,13 +79,9 @@ class LocationService : Service() {
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
-            currentInterval // 5000L când te miști
+            currentInterval
         ).apply {
-            // Îi spunem sistemului să NU aștepte mai mult de intervalul setat
-            // Asta forțează livrarea ping-ului la timp
             setMaxUpdateDelayMillis(currentInterval)
-
-            // Setăm intervalul minim egal cu cel actual
             setMinUpdateIntervalMillis(currentInterval)
         }.build()
 
@@ -103,7 +99,7 @@ class LocationService : Service() {
     private fun processNewLocation(location: Location) {
         android.util.Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
         val ping = TelemetryPing(
-            deviceId = currentDeviceId, // Folosim variabila din Service, nu text fix
+            deviceId = currentDeviceId,
             storeId = currentStoreId,
             itemId = currentItemId,
             triggerType = "BACKGROUND",
@@ -187,14 +183,12 @@ class LocationService : Service() {
             val z = event.values[2]
 
             val magnitude = sqrt((x * x + y * y + z * z).toDouble())
-            // Diferența față de gravitația pământului
             val acceleration = abs(magnitude - 9.81)
             val currentTime = System.currentTimeMillis()
 
             val movingNow = acceleration > 0.5
 
             if (movingNow) {
-                // Dacă detectăm mișcare, actualizăm timpul ultimei mișcări
                 lastMoveTime = currentTime
 
                 if (!isMoving) {
@@ -203,7 +197,6 @@ class LocationService : Service() {
                     updateLocationInterval()
                 }
             } else {
-                // Dacă e liniște, așteptăm 2 secunde înainte de a trece la 30s
                 if (isMoving && (currentTime - lastMoveTime > 2000)) {
                     isMoving = false
                     Log.d("TelemetryService", "STARE REPAUS - Trecem la 30s")
@@ -221,11 +214,9 @@ class LocationService : Service() {
 
         if (currentInterval == newInterval) return
 
-        // Dacă am ajuns aici, înseamnă că starea s-a schimbat (din mers în stat sau invers)
         currentInterval = newInterval
         Log.d("TelemetryService", "Interval SCHIMBAT REAL la: ${currentInterval/1000}s")
 
-        // DOAR ACUM resetăm actualizările, o singură dată la schimbarea stării
         fusedLocationClient.removeLocationUpdates(locationCallback)
         startLocationUpdates()
     }

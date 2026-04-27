@@ -29,9 +29,7 @@ class TelemetryDataTest {
     @Test
     fun telemetryPing_coordinatesValidation() {
         val ping = TelemetryPing("d", "s", "i", "t", 90.0, 180.0, 1f, 0L)
-            assertTrue("Latitude must be within [-90, 90]", ping.lat in -90.0..90.0)
-            assertTrue("Longitude must be within [-180, 180]", ping.lng in -180.0..180.0)
-
-        assertTrue("Latitude should be within range", ping.lat <= 180.0)
+        assertTrue("Latitude must be within [-90, 90]", ping.lat in -90.0..90.0)
+        assertTrue("Longitude must be within [-180, 180]", ping.lng in -180.0..180.0)
     }
 }

@@ -46,11 +46,6 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Location access granted!", Toast.LENGTH_SHORT).show()
             startLocationTrackingService()
 
-            onHardwareTriggerReceived(
-                storeId = "Lidl_01",
-                itemId = "Mere_Golden_05",
-                triggerType = "STARTUP_AUTO_SCAN"
-            )
             if (!notificationsGranted) {
                 Toast.makeText(this, "Notifications disabled. Service will run silently.", Toast.LENGTH_LONG).show()
             }

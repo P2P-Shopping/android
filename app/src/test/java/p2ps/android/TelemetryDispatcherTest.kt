@@ -16,11 +16,9 @@ import org.junit.Before
 
 class TelemetryDispatcherTest {
 
-    // Simulăm clasele de care depinde Dispatcher-ul nostru
     private val apiClient = mockk<ApiClient>(relaxed = true)
     private val telemetryManager = mockk<TelemetryManager>(relaxed = true)
 
-    // Injectăm mock-urile în dispatcher
     private val dispatcher = TelemetryDispatcher(apiClient, telemetryManager)
 
     @Before
@@ -31,8 +29,10 @@ class TelemetryDispatcherTest {
         every { Log.w(any<String>(), any<String>()) } returns 0
         every { Log.e(any<String>(), any<String>()) } returns 0
     }
-
-    // Un obiect de date generic pentru test
+    @After
+    fun tearDown() {
+        unmockkStatic(Log::class)
+    }
     private val testPing = TelemetryPing(
         deviceId = "test_id",
         storeId = "store_1",
@@ -44,25 +44,15 @@ class TelemetryDispatcherTest {
 
     @Test
     fun `test dispatch fallback when API fails`() {
-        // Forțăm ApiClient să returneze FALSE (ca să testăm logica de fallback)
         every { apiClient.sendPing(any()) } returns false
-
-        // Executăm metoda
         dispatcher.dispatch(testPing)
-
-        // VERIFICARE: S-a apelat savePing?
-        // Dacă da, SonarQube marchează liniile de fallback ca fiind "acoperite"
         verify(exactly = 1) { telemetryManager.savePing(testPing) }
     }
 
     @Test
     fun `test dispatch success when API works`() {
-        // Forțăm ApiClient să returneze TRUE
         every { apiClient.sendPing(any()) } returns true
-
         dispatcher.dispatch(testPing)
-
-        // VERIFICARE: Nu s-a apelat salvarea locală
         verify(exactly = 0) { telemetryManager.savePing(any()) }
     }
 }

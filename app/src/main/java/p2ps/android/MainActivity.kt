@@ -71,7 +71,9 @@ class MainActivity : ComponentActivity() {
         // Initialize Hardware SDK
         hardwareManager.initialize()
 
-        checkLocationPermission()
+        if (savedInstanceState == null) {
+            checkLocationPermission()
+        }
 
         enableEdgeToEdge()
         setContent {
@@ -84,14 +86,19 @@ class MainActivity : ComponentActivity() {
                                 ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
                             } else true
 
-                            if (fineLocation == PackageManager.PERMISSION_GRANTED && notificationsGranted) {
+                            if (fineLocation == PackageManager.PERMISSION_GRANTED) {
+
+                                if (!notificationsGranted) {
+                                    Toast.makeText(this, "Telemetry active (without notifications)", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(this, "Telemetry Started", Toast.LENGTH_SHORT).show()
+                                }
+
                                 onHardwareTriggerReceived("store_ABC", "item_123")
                                 startLocationTrackingService()
-                                Toast.makeText(this, "Telemetry Started", Toast.LENGTH_SHORT).show()
+
                             } else {
-                                val message = if (!notificationsGranted) "Notification permission is required for background tracking"
-                                else "Please allow location to simulate trigger"
-                                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, "Please allow location to simulate trigger", Toast.LENGTH_SHORT).show()
                                 checkLocationPermission()
                             }
                         },

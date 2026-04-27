@@ -5,13 +5,11 @@ import p2ps.android.data.TelemetryPing
 
 class ApiClient {
     private val TAG = "ApiClient"
-
     fun sendPing(ping: TelemetryPing): Boolean {
         Log.i(TAG, "POST /api/telemetry/ping")
-        Log.d(TAG, "Dispatching ping: deviceId=${ping.deviceId}, trigger=${ping.triggerType}")
 
-
-        val isSuccess = true
+        // TODO(task-40): replace with real HTTP call (Retrofit)
+        val isSuccess = simulateNetworkSuccess()
 
         if (!isSuccess) {
             Log.e(TAG, "Network failure: simulation of failed request")
@@ -20,6 +18,6 @@ class ApiClient {
 
         Log.i(TAG, "Simulation: Telemetry accepted (202 Accepted)")
         return true
-
     }
+    private fun simulateNetworkSuccess(): Boolean = true
 }

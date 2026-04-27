@@ -20,7 +20,6 @@ class TelemetryDataTest {
             timestamp = currentTime
         )
 
-        // Verificăm dacă datele sunt stocate corect în obiect
         assertEquals("test_dev", ping.deviceId)
         assertEquals(44.4268, ping.lat, 0.0001)
         assertEquals("BACKGROUND", ping.triggerType)
@@ -29,10 +28,10 @@ class TelemetryDataTest {
 
     @Test
     fun telemetryPing_coordinatesValidation() {
-        // Un test simplu să ne asigurăm că latitudinea e validă
-        val ping = TelemetryPing("d", "s", "i", "t", 91.0, 0.0, 1f, 0L)
+        val ping = TelemetryPing("d", "s", "i", "t", 90.0, 180.0, 1f, 0L)
+            assertTrue("Latitude must be within [-90, 90]", ping.lat in -90.0..90.0)
+            assertTrue("Longitude must be within [-180, 180]", ping.lng in -180.0..180.0)
 
-        // Aici am putea adăuga logică de validare în viitor
         assertTrue("Latitude should be within range", ping.lat <= 180.0)
     }
 }

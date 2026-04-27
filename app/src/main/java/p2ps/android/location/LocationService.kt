@@ -14,12 +14,15 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import com.google.android.gms.location.*
 import p2ps.android.R
 import java.util.concurrent.TimeUnit
 import p2ps.android.MainActivity
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
+import p2ps.android.ApiClient
+import p2ps.android.core.TelemetryDispatcher
 
 class LocationService : Service() {
 
@@ -29,6 +32,7 @@ class LocationService : Service() {
     private val NOTIFICATION_ID = 12345
 
     private lateinit var telemetryManager: TelemetryManager
+    private lateinit var telemetryDispatcher: TelemetryDispatcher
 
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
@@ -38,6 +42,8 @@ class LocationService : Service() {
         super.onCreate()
 
         telemetryManager = TelemetryManager(this)
+
+        telemetryDispatcher = TelemetryDispatcher(ApiClient(), telemetryManager)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         locationCallback = object : LocationCallback() {
@@ -64,7 +70,8 @@ class LocationService : Service() {
                 locationCallback,
                 Looper.getMainLooper()
             )
-        } catch (unlikely: SecurityException) {
+        } catch (e: SecurityException) {
+            Log.e("LocationService", "Missing location permission at update time", e)
             stopSelf()
         }
     }
@@ -72,7 +79,7 @@ class LocationService : Service() {
     private fun processNewLocation(location: Location) {
         android.util.Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
         val ping = TelemetryPing(
-            deviceId = "usr_DEMO",
+            deviceId = currentDeviceId, // Folosim variabila din Service, nu text fix
             storeId = currentStoreId,
             itemId = currentItemId,
             triggerType = "BACKGROUND",
@@ -81,7 +88,8 @@ class LocationService : Service() {
             accuracy = location.accuracy,
             timestamp = System.currentTimeMillis()
         )
-        telemetryManager.savePing(ping)
+        //telemetryManager.savePing(ping)
+        telemetryDispatcher.dispatch(ping)
 
 
     }

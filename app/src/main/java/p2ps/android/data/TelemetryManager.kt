@@ -21,16 +21,7 @@ class TelemetryManager(context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + errorHandler)
     fun savePing(ping: TelemetryPing) {
-        val entity = TelemetryEntity(
-            deviceId = ping.deviceId,
-            storeId = ping.storeId,
-            itemId = ping.itemId,
-            triggerType = ping.triggerType,
-            latitude = ping.lat,
-            longitude = ping.lng,
-            accuracy = ping.accuracy,
-            timestamp = ping.timestamp
-        )
+        val entity = ping.toEntity()
 
         scope.launch {
             try {
@@ -54,8 +45,6 @@ class TelemetryManager(context: Context) {
             Log.e("TelemetryManager", "Failed to delete pings from cache", e)
         }
     }
-
-    // Metodă de urgență pentru a curăța tot cache-ul
     suspend fun clearAllCache() {
         telemetryDao.clearCache()
     }

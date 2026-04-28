@@ -61,7 +61,7 @@ class ApiClientTest {
         // Expected success rate is ~80% (threshold > 0.2f).
         // With 500 samples the observed rate should be between 70% and 90%.
         val n = 500
-        val successes = (1..n).count { runBlocking { apiClient.sendPing(testPing) } }
+        val successes = (1..n).count { apiClient.sendPing(testPing) }
         val rate = successes.toDouble() / n
         assertTrue(
             "Success rate $rate is outside expected range [0.70, 0.90]",

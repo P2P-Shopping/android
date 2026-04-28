@@ -4,6 +4,7 @@ import org.junit.Test
 import org.junit.Assert.*
 import p2ps.android.data.TelemetryEntity
 import p2ps.android.data.TelemetryPing
+import p2ps.android.data.toEntity
 
 class TelemetryDataTest {
 
@@ -156,17 +157,7 @@ class TelemetryDataTest {
             accuracy = 7.3f,
             timestamp = 999888777L
         )
-        // Replicate the mapping done in TelemetryManager.savePing
-        val entity = TelemetryEntity(
-            deviceId = ping.deviceId,
-            storeId = ping.storeId,
-            itemId = ping.itemId,
-            triggerType = ping.triggerType,
-            latitude = ping.lat,
-            longitude = ping.lng,
-            accuracy = ping.accuracy,
-            timestamp = ping.timestamp
-        )
+        val entity = ping.toEntity()
 
         assertEquals(ping.deviceId, entity.deviceId)
         assertEquals(ping.storeId, entity.storeId)

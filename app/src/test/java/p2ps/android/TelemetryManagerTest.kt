@@ -38,7 +38,7 @@ class TelemetryManagerTest {
         every { Log.e(any<String>(), any<String>(), any()) } returns 0
         every { Log.e(any<String>(), any<String>()) } returns 0
 
-        mockkObject(AppDatabase)
+        mockkObject(AppDatabase.Companion)
         every { AppDatabase.getDatabase(any()) } returns mockDatabase
         every { mockDatabase.telemetryDao() } returns mockDao
 
@@ -175,10 +175,11 @@ class TelemetryManagerTest {
     }
 
     @Test
-    fun savePing_withValidPing_doesNotThrow() {
+    fun savePing_withValidPing_triggersDaoInsertion() = runBlocking {
         val ping = TelemetryPing("dev", "store", "item", "BACKGROUND", 44.0, 26.0, 5f, 1000L)
-        // savePing is non-blocking; it launches a coroutine internally
+
         telemetryManager.savePing(ping)
-        // If this point is reached without exception, the test passes
+
+        coVerify(exactly = 1) { mockDao.insertPing(any()) }
     }
 }

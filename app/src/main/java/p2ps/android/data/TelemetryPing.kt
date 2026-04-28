@@ -14,3 +14,18 @@ data class TelemetryPing(
     val accuracy: Float,
     val timestamp: Long
 )
+/**
+ * Extension function to map TelemetryPing to TelemetryEntity for Room persistence.
+ */
+fun TelemetryPing.toEntity(): TelemetryEntity {
+    return TelemetryEntity(
+        deviceId = this.deviceId,
+        storeId = this.storeId,
+        itemId = this.itemId,
+        triggerType = this.triggerType,
+        latitude = this.lat,
+        longitude = this.lng,
+        accuracy = this.accuracy,
+        timestamp = this.timestamp
+    )
+}

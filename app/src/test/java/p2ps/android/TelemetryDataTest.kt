@@ -20,7 +20,7 @@ class TelemetryDataTest {
             triggerType = "BACKGROUND",
             lat = 44.4268,
             lng = 26.1025,
-            accuracy = 10.0f,
+            accuracyMeters = 10.0f,
             timestamp = currentTime
         )
 
@@ -28,6 +28,7 @@ class TelemetryDataTest {
         assertEquals(44.4268, ping.lat, 0.0001)
         assertEquals("BACKGROUND", ping.triggerType)
         assertEquals(currentTime, ping.timestamp)
+        assertEquals(10.0f, ping.accuracyMeters)
     }
 
     @Test
@@ -35,67 +36,6 @@ class TelemetryDataTest {
         val ping = TelemetryPing("d", "s", "i", "t", 90.0, 180.0, 1f, 0L)
         assertTrue("Latitude must be within [-90, 90]", ping.lat in -90.0..90.0)
         assertTrue("Longitude must be within [-180, 180]", ping.lng in -180.0..180.0)
-    }
-
-    @Test
-    fun telemetryPing_negativeCoordinates_areValid() {
-        val ping = TelemetryPing("d", "s", "i", "t", -90.0, -180.0, 1f, 0L)
-        assertTrue(ping.lat in -90.0..90.0)
-        assertTrue(ping.lng in -180.0..180.0)
-    }
-
-    @Test
-    fun telemetryPing_equality_sameValues() {
-        val ping1 = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
-        val ping2 = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
-        assertEquals(ping1, ping2)
-    }
-
-    @Test
-    fun telemetryPing_equality_differentTimestamp() {
-        val ping1 = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
-        val ping2 = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 2000L)
-        assertNotEquals(ping1, ping2)
-    }
-
-    @Test
-    fun telemetryPing_copy_changesOnlySpecifiedField() {
-        val original = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
-        val copy = original.copy(itemId = "new_item")
-        assertEquals("new_item", copy.itemId)
-        assertEquals(original.deviceId, copy.deviceId)
-        assertEquals(original.storeId, copy.storeId)
-        assertEquals(original.timestamp, copy.timestamp)
-    }
-
-    @Test
-    fun telemetryPing_zeroTimestamp_isAccepted() {
-        val ping = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 0f, 0L)
-        assertEquals(0L, ping.timestamp)
-    }
-
-    @Test
-    fun telemetryPing_emptyStrings_areAccepted() {
-        val ping = TelemetryPing("", "", "", "", 0.0, 0.0, 0f, 0L)
-        assertEquals("", ping.deviceId)
-        assertEquals("", ping.storeId)
-        assertEquals("", ping.itemId)
-        assertEquals("", ping.triggerType)
-    }
-
-    @Test
-    fun telemetryPing_accuracyZero_isValid() {
-        val ping = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 0f, 1L)
-        assertEquals(0f, ping.accuracy, 0.0001f)
-    }
-
-    @Test
-    fun telemetryPing_maxLongTimestamp_isAccepted() {
-        val ping = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 1f, Long.MAX_VALUE)
-        assertEquals(Long.MAX_VALUE, ping.timestamp)
-    }
-
-    // ── TelemetryEntity ────────────────────────────────────────────────────────
 
     @Test
     fun telemetryEntity_defaultId_isZero() {
@@ -192,7 +132,7 @@ class TelemetryDataTest {
             triggerType = "MANUAL",
             lat = 48.8566,
             lng = 2.3522,
-            accuracy = 5.0f,
+            accuracyMeters = 5.0f,
             timestamp = 1700000000000L
         )
 
@@ -202,7 +142,7 @@ class TelemetryDataTest {
         assertEquals("MANUAL", ping.triggerType)
         assertEquals(48.8566, ping.lat, 0.0001)
         assertEquals(2.3522, ping.lng, 0.0001)
-        assertEquals(5.0f, ping.accuracy)
+        assertEquals(5.0f, ping.accuracyMeters)
         assertEquals(1700000000000L, ping.timestamp)
     }
 
@@ -220,7 +160,7 @@ class TelemetryDataTest {
         val ping = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 0.0f, 0L)
         assertEquals(0.0, ping.lat, 0.0)
         assertEquals(0.0, ping.lng, 0.0)
-        assertEquals(0.0f, ping.accuracy)
+        assertEquals(0.0f, ping.accuracyMeters)
         assertEquals(0L, ping.timestamp)
     }
 

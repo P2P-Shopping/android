@@ -19,9 +19,16 @@ class TelemetryManager(context: Context) {
         Log.e("TelemetryManager", "Coroutine failed: ${throwable.message}", throwable)
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + errorHandler)
-    fun savePing(ping: TelemetryPing) {
-        val entity = ping.toEntity()
+        val dataString = JSONObject()
+            .put("deviceId", ping.deviceId)
+            .put("storeId", ping.storeId)
+            .put("itemId", ping.itemId)
+            .put("triggerType", ping.triggerType)
+            .put("timestamp", ping.timestamp)
+            .put("lat", ping.lat)
+            .put("lng", ping.lng)
+            .put("accuracyMeters", ping.accuracyMeters)
+            .toString()
 
         scope.launch {
             try {
@@ -37,20 +44,30 @@ class TelemetryManager(context: Context) {
         return telemetryDao.getAllPings()
     }
 
-    suspend fun deletePings(pings: List<TelemetryEntity>) {
-        try {
-            telemetryDao.deletePings(pings)
-            Log.d("TelemetryManager", "Cleared ${pings.size} sent pings from cache.")
-        } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to delete pings from cache", e)
-        }
-    }
-    suspend fun clearAllCache() {
-        try {
-            telemetryDao.clearCache()
-            Log.d("TelemetryManager", "Cache cleared.")
-        } catch (e: Exception) {
-            Log.e("TelemetryManager", "Failed to clear cache", e)
+    fun getAllStoredPings(): List<TelemetryPing> {
+        val allEntries = prefs.all
+        val pings = mutableListOf<TelemetryPing>()
+        
+        allEntries.forEach { (_, value) ->
+            if (value is String) {
+                try {
+                    val json = JSONObject(value)
+                    pings.add(
+                        TelemetryPing(
+                            deviceId = json.getString("deviceId"),
+                            storeId = json.getString("storeId"),
+                            itemId = json.getString("itemId"),
+                            triggerType = json.getString("triggerType"),
+                            timestamp = json.getLong("timestamp"),
+                            lat = json.getDouble("lat"),
+                            lng = json.getDouble("lng"),
+                            accuracyMeters = json.getDouble("accuracyMeters").toFloat()
+                        )
+                    )
+                } catch (e: Exception) {
+                    // Skip malformed entries
+                }
+            }
         }
     }
 }

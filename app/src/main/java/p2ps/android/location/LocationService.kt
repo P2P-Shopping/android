@@ -16,9 +16,14 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Log
 import com.google.android.gms.location.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import p2ps.android.R
 import java.util.concurrent.TimeUnit
 import p2ps.android.MainActivity
+import p2ps.android.HardwareManager
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.ApiClient
@@ -39,6 +44,8 @@ class LocationService : Service() {
 
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private lateinit var hardwareManager: HardwareManager
 
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
@@ -56,8 +63,10 @@ class LocationService : Service() {
         super.onCreate()
 
         telemetryManager = TelemetryManager(this)
-
-        telemetryDispatcher = TelemetryDispatcher(ApiClient(), telemetryManager)
+        telemetryDispatcher = TelemetryDispatcher(ApiClient(this), telemetryManager)
+        hardwareManager = HardwareManager(telemetryDispatcher, serviceScope)
+        hardwareManager.initialize()
+        
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         locationCallback = object : LocationCallback() {
@@ -76,6 +85,7 @@ class LocationService : Service() {
             sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
     }
+
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
@@ -97,7 +107,7 @@ class LocationService : Service() {
     }
 
     private fun processNewLocation(location: Location) {
-        android.util.Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
+        Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
         val ping = TelemetryPing(
             deviceId = currentDeviceId,
             storeId = currentStoreId,
@@ -105,10 +115,18 @@ class LocationService : Service() {
             triggerType = "BACKGROUND",
             lat = location.latitude,
             lng = location.longitude,
-            accuracy = location.accuracy,
+            accuracyMeters = location.accuracy,
             timestamp = System.currentTimeMillis()
         )
-        telemetryDispatcher.dispatch(ping)
+
+        // Logica de pe branch-ul main
+        telemetryManager.savePing(ping)
+        hardwareManager.handleHardwareTrigger(ping)
+
+        // Logica de pe branch-ul feature
+        serviceScope.launch {
+            telemetryDispatcher.dispatch(ping)
+        }
     }
     private fun createNotification(): android.app.Notification {
         val pendingIntent = PendingIntent.getActivity(
@@ -237,6 +255,4 @@ class LocationService : Service() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
         sensorManager.unregisterListener(sensorListener)
     }
-
-
 }

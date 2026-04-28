@@ -1,26 +1,79 @@
 package p2ps.android
 
+import android.content.Context
 import android.util.Log
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import p2ps.android.data.TelemetryBatch
 import p2ps.android.data.TelemetryPing
-import kotlin.random.Random
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.util.UUID
 
-class ApiClient {
-    private val TAG = "ApiClient"
-    suspend fun sendPing(ping: TelemetryPing): Boolean {
-        Log.i(TAG, "POST /api/telemetry/ping")
+class ApiClient(context: Context) {
+    companion object {
+        private const val TAG = "ApiClient"
+        private const val BASE_URL = "http://10.0.2.2:8081/api/"
+    }
 
-        // TODO(task-40): replace with real HTTP call (Retrofit)
-        val isSuccess = simulateNetworkSuccess()
+    private val apiService: ApiService
+    private val deviceId: String
 
-        if (!isSuccess) {
-            Log.e(TAG, "Network failure: simulation of failed request")
-            return false
+    init {
+        // Generăm sau recuperăm un ID unic pentru acest telefon
+        val prefs = context.getSharedPreferences("p2ps_prefs", Context.MODE_PRIVATE)
+        deviceId = prefs.getString("DEVICE_ID", null) ?: UUID.randomUUID().toString().also {
+            prefs.edit().putString("DEVICE_ID", it).apply()
         }
 
-        Log.i(TAG, "Simulation: Telemetry accepted (202 Accepted)")
-        return true
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+        }
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("X-API-Key", BuildConfig.API_KEY) // Din local.properties
+                    .addHeader("X-Device-Id", deviceId)          // Dinamic per dispozitiv
+                    .build()
+                chain.proceed(request)
+            }
+            .addInterceptor(logging)
+            .build()
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
+            .build()
+
+        apiService = retrofit.create(ApiService::class.java)
     }
-    private fun simulateNetworkSuccess(): Boolean {
-        return Random.nextFloat() > 0.2f
+
+    suspend fun sendPing(ping: TelemetryPing): Boolean {
+        return try {
+            Log.d(TAG, "Trimitere telemetrie pentru: ${ping.itemId}")
+            val response = apiService.sendPing(ping)
+            if (response.isSuccessful || response.code() == 202) {
+                Log.i(TAG, "Succes: ${response.code()}")
+                true
+            } else {
+                Log.e(TAG, "Eroare server: ${response.code()}")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare rețea: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun sendBatch(pings: List<TelemetryPing>): Boolean {
+        return try {
+            val response = apiService.sendBatchPings(TelemetryBatch(pings))
+            response.isSuccessful || response.code() == 202
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare batch: ${e.message}")
+            false
+        }
     }
 }

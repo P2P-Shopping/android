@@ -22,7 +22,7 @@ class ApiClientTest {
         triggerType = "BACKGROUND",
         lat = 44.4268,
         lng = 26.1025,
-        accuracy = 8f,
+        accuracyMeters = 10.0f,
         timestamp = 1700000000000L
     )
 

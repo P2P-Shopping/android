@@ -14,6 +14,7 @@ class HardwareManager(
 ) {
     private val TAG = "HardwareManager"
     private var isInitialized = false
+    private val fallbackScope = CoroutineScope(SupervisorJob() + dispatcher)
 
     // 1. Initializing the SDK
     fun initialize() {
@@ -51,11 +52,14 @@ class HardwareManager(
         }
 
         Log.i(TAG, "Hardware Trigger Detected for item: ${ping.itemId}")
-        val scope = externalScope ?: CoroutineScope(dispatcher)
+        val scope = externalScope ?: fallbackScope
 
         scope.launch {
             try {
-                apiClient.sendPing(ping)
+                val success = apiClient.sendPing(ping)
+                if (!success) {
+                    Log.w(TAG, "sendPing returned false for item: ${ping.itemId}. Consider fallback.")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send ping from hardware trigger", e)
             }

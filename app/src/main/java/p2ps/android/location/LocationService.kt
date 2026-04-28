@@ -108,12 +108,8 @@ class LocationService : Service() {
             accuracy = location.accuracy,
             timestamp = System.currentTimeMillis()
         )
-        //telemetryManager.savePing(ping)
         telemetryDispatcher.dispatch(ping)
-
-
     }
-
     private fun createNotification(): android.app.Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
@@ -207,7 +203,9 @@ class LocationService : Service() {
             }
         }
 
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+            // No action needed for accuracy changes in this implementation
+        }
     }
 
     private fun updateLocationInterval() {

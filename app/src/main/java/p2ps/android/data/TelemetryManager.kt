@@ -46,6 +46,11 @@ class TelemetryManager(context: Context) {
         }
     }
     suspend fun clearAllCache() {
-        telemetryDao.clearCache()
+        try {
+            telemetryDao.clearCache()
+            Log.d("TelemetryManager", "Cache cleared.")
+        } catch (e: Exception) {
+            Log.e("TelemetryManager", "Failed to clear cache", e)
+        }
     }
 }

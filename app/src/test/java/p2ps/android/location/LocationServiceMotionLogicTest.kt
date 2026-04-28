@@ -48,8 +48,7 @@ class LocationServiceMotionLogicTest {
     }
 
     @Test
-    fun exactThreshold_notMoving() {
-        // acceleration = 0.5 → NOT strictly greater than 0.5 → false
+    fun belowThreshold_notMoving() {
         val z = (9.81 + 0.1).toFloat()
         Assert.assertFalse(LocationService().calculateIsMoving(0f, 0f, z))
     }

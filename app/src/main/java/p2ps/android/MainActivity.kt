@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.ui.theme.P2PSAndroidTheme
@@ -31,7 +32,14 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var telemetryDispatcher: TelemetryDispatcher
     private val hardwareManager = HardwareManager()
+
+    companion object {
+        private const val DEFAULT_DEVICE_ID = "usr_DEMO"
+        private const val DEFAULT_STORE_ID = "Lidl_01"
+        private const val DEFAULT_ITEM_ID = "Background_Track"
+    }
 
     // Handles permissions and UI/State updates ONLY.
     private val requestPermissionLauncher = registerForActivityResult(
@@ -71,6 +79,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         telemetryManager = TelemetryManager(this)
+        telemetryDispatcher = p2ps.android.core.TelemetryDispatcher(ApiClient(), telemetryManager)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         
         // Initialize Hardware SDK
@@ -167,12 +176,8 @@ class MainActivity : ComponentActivity() {
                         accuracy = location.accuracy,
                         timestamp = System.currentTimeMillis()
                     )
-                    
-                    // 1. Save locally via existing TelemetryManager
-                    telemetryManager.savePing(ping)
-                    
-                    // 2. Delegate to HardwareManager flow from Task #149
-                    hardwareManager.handleHardwareTrigger(ping)
+
+                    telemetryDispatcher.dispatch(ping)
 
                     runOnUiThread {
                         Toast.makeText(this, "Telemetry processed: ${location.latitude}, ${location.longitude}", Toast.LENGTH_SHORT).show()
@@ -206,9 +211,9 @@ class MainActivity : ComponentActivity() {
 
     private fun startLocationTrackingService() {
         val intent = android.content.Intent(this, p2ps.android.location.LocationService::class.java).apply {
-            putExtra("EXTRA_DEVICE_ID", "usr_DEMO")
-            putExtra("EXTRA_STORE_ID", "Lidl_01")
-            putExtra("EXTRA_ITEM_ID", "Background_Track")
+            putExtra("EXTRA_DEVICE_ID", DEFAULT_DEVICE_ID)
+            putExtra("EXTRA_STORE_ID", DEFAULT_STORE_ID)
+            putExtra("EXTRA_ITEM_ID", DEFAULT_ITEM_ID)
         }
         startForegroundService(intent)
     }

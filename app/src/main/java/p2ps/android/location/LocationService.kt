@@ -79,7 +79,7 @@ class LocationService : Service() {
     private fun processNewLocation(location: Location) {
         android.util.Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
         val ping = TelemetryPing(
-            deviceId = currentDeviceId, // Folosim variabila din Service, nu text fix
+            deviceId = currentDeviceId,
             storeId = currentStoreId,
             itemId = currentItemId,
             triggerType = "BACKGROUND",
@@ -88,10 +88,11 @@ class LocationService : Service() {
             accuracy = location.accuracy,
             timestamp = System.currentTimeMillis()
         )
-        //telemetryManager.savePing(ping)
-        telemetryDispatcher.dispatch(ping)
-
-
+        
+        // Rulăm pe un thread separat pentru a evita NetworkOnMainThreadException
+        Thread {
+            telemetryDispatcher.dispatch(ping)
+        }.start()
     }
 
     private fun createNotification(): android.app.Notification {

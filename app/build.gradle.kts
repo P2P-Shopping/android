@@ -2,24 +2,21 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
     alias(libs.plugins.sonarqube)
-    id("jacoco")
-
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("com.google.devtools.ksp")
-
+    alias(libs.plugins.jacoco)
 }
 
 android {
     namespace = "p2ps.android"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "p2ps.android"
         minSdk = 31
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -53,9 +50,19 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
+
+    kotlinOptions {
+        jvmTarget = "21"
+    }
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
 }
 
 dependencies {
@@ -73,6 +80,11 @@ dependencies {
     
     // Location
     implementation(libs.play.services.location)
+
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
     // Testare
     testImplementation(libs.junit)

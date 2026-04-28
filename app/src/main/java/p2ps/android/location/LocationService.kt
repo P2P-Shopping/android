@@ -1,39 +1,37 @@
 package p2ps.android.location
 
-import android.annotation.SuppressLint
-import android.app.*
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.Location
+import android.os.Build
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import android.content.pm.ServiceInfo
-import android.os.Build
 import androidx.core.content.ContextCompat
-import android.Manifest
-import android.content.pm.PackageManager
-import android.util.Log
 import com.google.android.gms.location.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import p2ps.android.R
-import java.util.concurrent.TimeUnit
+import p2ps.android.ApiClient
 import p2ps.android.MainActivity
-import p2ps.android.HardwareManager
+import p2ps.android.R
+import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
-import p2ps.android.ApiClient
-import p2ps.android.core.TelemetryDispatcher
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import kotlin.math.abs
-import kotlin.math.sqrt
 
 class LocationService : Service() {
 
@@ -45,11 +43,11 @@ class LocationService : Service() {
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private lateinit var hardwareManager: HardwareManager
 
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
     private var currentItemId = "unknown"
+    
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
     private var isMoving = true
@@ -58,14 +56,11 @@ class LocationService : Service() {
     private val INTERVAL_STATIONARY = 30000L
     private var currentInterval = INTERVAL_MOVING
 
-
     override fun onCreate() {
         super.onCreate()
 
         telemetryManager = TelemetryManager(this)
         telemetryDispatcher = TelemetryDispatcher(ApiClient(this), telemetryManager)
-        hardwareManager = HardwareManager(telemetryDispatcher, serviceScope)
-        hardwareManager.initialize()
         
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
@@ -107,7 +102,7 @@ class LocationService : Service() {
     }
 
     private fun processNewLocation(location: Location) {
-        Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
+        Log.d("TelemetryService", "New telemetry ping generated at ${location.time} (isMoving: $isMoving)")
         val ping = TelemetryPing(
             deviceId = currentDeviceId,
             storeId = currentStoreId,
@@ -119,15 +114,11 @@ class LocationService : Service() {
             timestamp = System.currentTimeMillis()
         )
 
-        // Logica de pe branch-ul main
-        telemetryManager.savePing(ping)
-        hardwareManager.handleHardwareTrigger(ping)
-
-        // Logica de pe branch-ul feature
         serviceScope.launch {
             telemetryDispatcher.dispatch(ping)
         }
     }
+
     private fun createNotification(): android.app.Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
@@ -182,7 +173,7 @@ class LocationService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Background location tracking for telemetry"
-                setShowBadge(true) //bulina aplicatie
+                setShowBadge(true)
             }
             manager.createNotificationChannel(channel)
         }
@@ -198,8 +189,6 @@ class LocationService : Service() {
 
             val movingNow = calculateIsMoving(x, y, z)
             val currentTime = System.currentTimeMillis()
-
-
             val MOVE_DEBOUNCE_MS = 2000L
 
             if (movingNow) {
@@ -216,39 +205,31 @@ class LocationService : Service() {
                     Log.d("TelemetryService", "Stationary – switching to 30s")
                     updateLocationInterval()
                 } else if (!isMoving) {
-                    lastMoveTime = currentTime // reset accumulator while stationary
+                    lastMoveTime = currentTime 
                 }
             }
         }
 
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-            // No action needed for accuracy changes in this implementation
-        }
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
 
     private fun updateLocationInterval() {
         val newInterval = if (isMoving) INTERVAL_MOVING else INTERVAL_STATIONARY
 
-
         if (currentInterval == newInterval) return
 
         currentInterval = newInterval
-        Log.d("TelemetryService", "Interval SCHIMBAT REAL la: ${currentInterval/1000}s")
+        Log.d("TelemetryService", "Interval changed to: ${currentInterval/1000}s")
 
         fusedLocationClient.removeLocationUpdates(locationCallback)
         startLocationUpdates()
     }
-    // Acestea sunt funcțiile pe care testul le va "vedea" și le va măsura
+
     fun calculateIsMoving(x: Float, y: Float, z: Float): Boolean {
         val magnitude = kotlin.math.sqrt((x * x + y * y + z * z).toDouble())
         val acceleration = kotlin.math.abs(magnitude - 9.81)
         return acceleration > 0.5
     }
-
-    fun getNextInterval(isMovingNow: Boolean): Long {
-        return if (isMovingNow) INTERVAL_MOVING else INTERVAL_STATIONARY
-    }
-
 
     override fun onDestroy() {
         super.onDestroy()

@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
                         triggerType = triggerType,
                         lat = location.latitude,
                         lng = location.longitude,
-                        accuracy = location.accuracy,
+                        accuracyMeters = location.accuracy,
                         timestamp = System.currentTimeMillis()
                     )
                     

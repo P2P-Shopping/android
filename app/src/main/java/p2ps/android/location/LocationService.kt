@@ -29,6 +29,7 @@ class LocationService : Service() {
     private val NOTIFICATION_ID = 12345
 
     private lateinit var telemetryManager: TelemetryManager
+    private val hardwareManager = p2ps.android.HardwareManager()
 
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
@@ -38,6 +39,7 @@ class LocationService : Service() {
         super.onCreate()
 
         telemetryManager = TelemetryManager(this)
+        hardwareManager.initialize()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         locationCallback = object : LocationCallback() {
@@ -78,10 +80,11 @@ class LocationService : Service() {
             triggerType = "BACKGROUND",
             lat = location.latitude,
             lng = location.longitude,
-            accuracy = location.accuracy,
+            accuracyMeters = location.accuracy,
             timestamp = System.currentTimeMillis()
         )
         telemetryManager.savePing(ping)
+        hardwareManager.handleHardwareTrigger(ping)
 
 
     }

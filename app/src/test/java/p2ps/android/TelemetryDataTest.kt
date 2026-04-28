@@ -16,7 +16,7 @@ class TelemetryDataTest {
             triggerType = "BACKGROUND",
             lat = 44.4268,
             lng = 26.1025,
-            accuracy = 10.0f,
+            accuracyMeters = 10.0f,
             timestamp = currentTime
         )
 

@@ -23,7 +23,7 @@ class TelemetryManager(context: Context) {
             .put("timestamp", ping.timestamp)
             .put("lat", ping.lat)
             .put("lng", ping.lng)
-            .put("accuracy", ping.accuracy)
+            .put("accuracyMeters", ping.accuracyMeters)
             .toString()
 
         val uniqueKey = "ping_${ping.timestamp}_${UUID.randomUUID()}"
@@ -49,7 +49,7 @@ class TelemetryManager(context: Context) {
                             timestamp = json.getLong("timestamp"),
                             lat = json.getDouble("lat"),
                             lng = json.getDouble("lng"),
-                            accuracy = json.getDouble("accuracy").toFloat()
+                            accuracyMeters = json.getDouble("accuracyMeters").toFloat()
                         )
                     )
                 } catch (e: Exception) {

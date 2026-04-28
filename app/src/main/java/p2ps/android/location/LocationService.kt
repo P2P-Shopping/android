@@ -16,6 +16,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Log
 import com.google.android.gms.location.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import p2ps.android.R
 import java.util.concurrent.TimeUnit
 import p2ps.android.MainActivity
@@ -33,6 +37,7 @@ class LocationService : Service() {
 
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
@@ -89,10 +94,10 @@ class LocationService : Service() {
             timestamp = System.currentTimeMillis()
         )
         
-        // Rulăm pe un thread separat pentru a evita NetworkOnMainThreadException
-        Thread {
+        // Folosim CoroutineScope pentru a rula asincron și sigur
+        serviceScope.launch {
             telemetryDispatcher.dispatch(ping)
-        }.start()
+        }
     }
 
     private fun createNotification(): android.app.Notification {

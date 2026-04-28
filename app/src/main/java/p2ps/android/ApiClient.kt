@@ -19,7 +19,6 @@ class ApiClient {
     private val apiService: ApiService
 
     init {
-        // Interceptor pentru adăugarea headerelor de autentificare (X-API-Key și X-Device-Id)
         val authInterceptor = Interceptor { chain ->
             val request = chain.request().newBuilder()
                 .addHeader("X-API-Key", API_KEY)
@@ -46,16 +45,14 @@ class ApiClient {
         apiService = retrofit.create(ApiService::class.java)
     }
 
-    fun sendPing(ping: TelemetryPing): Boolean {
+    /**
+     * Sends a telemetry ping to the server using Coroutines.
+     * This is the modern, thread-safe way to handle network calls in Android.
+     */
+    suspend fun sendPing(ping: TelemetryPing): Boolean {
         return try {
-            // Verificăm dacă suntem pe firul principal pentru a evita crash-ul
-            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-                Log.w(TAG, "Network call attempted on Main Thread! Redirection to background required.")
-                return false
-            }
-
-            Log.i(TAG, "Attempting POST /api/telemetry/ping")
-            val response = apiService.sendPing(ping).execute()
+            Log.i(TAG, "Executing POST /api/telemetry/ping via Coroutines")
+            val response = apiService.sendPing(ping)
             
             if (response.isSuccessful) {
                 Log.i(TAG, "Telemetry accepted (202 Accepted)")

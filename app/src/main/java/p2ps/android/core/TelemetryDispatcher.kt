@@ -11,9 +11,12 @@ class TelemetryDispatcher(
 ) {
     private val TAG = "TelemetryDispatcher"
 
-    fun dispatch(ping: TelemetryPing) {
+    /**
+     * Dispatches a ping. Now a suspend function to integrate with modern Coroutines.
+     */
+    suspend fun dispatch(ping: TelemetryPing) {
         try {
-            // Pas 1: Încercăm să trimitem prin API
+            // Pas 1: Încercăm să trimitem prin API (suspend call)
             val responseSuccessful = apiClient.sendPing(ping)
 
             // Pas 2: Dacă a eșuat (false), salvăm local
@@ -21,7 +24,7 @@ class TelemetryDispatcher(
                 handleFallback(ping, "API reported failure")
             }
         } catch (e: Exception) {
-            // Pas 3: Dacă a dat crash rețeaua (ex: No Internet), salvăm local
+            // Pas 3: Dacă a dat crash rețeaua, salvăm local
             handleFallback(ping, "Exception: ${e.message}")
         }
     }

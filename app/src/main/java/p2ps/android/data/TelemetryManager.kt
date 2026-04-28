@@ -1,62 +1,65 @@
 package p2ps.android.data
 
 import android.content.Context
-import android.content.SharedPreferences
-import org.json.JSONObject
-import java.util.UUID
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
- * Persists telemetry data locally using SharedPreferences.
+ * Persists telemetry data locally using Room Database.
  * Ensures data is not lost when the device is offline.
  */
 class TelemetryManager(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("telemetry_prefs", Context.MODE_PRIVATE)
 
+    private val db = AppDatabase.getDatabase(context)
+    private val telemetryDao = db.telemetryDao()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    /**
+     * Saves a telemetry ping to the local Room database.
+     */
     fun savePing(ping: TelemetryPing) {
-        val editor = prefs.edit()
+        val entity = TelemetryEntity(
+            deviceId = ping.deviceId,
+            storeId = ping.storeId,
+            itemId = ping.itemId,
+            triggerType = ping.triggerType,
+            latitude = ping.lat,
+            longitude = ping.lng,
+            accuracy = ping.accuracyMeters,
+            timestamp = ping.timestamp
+        )
 
-        val dataString = JSONObject()
-            .put("deviceId", ping.deviceId)
-            .put("storeId", ping.storeId)
-            .put("itemId", ping.itemId)
-            .put("triggerType", ping.triggerType)
-            .put("timestamp", ping.timestamp)
-            .put("lat", ping.lat)
-            .put("lng", ping.lng)
-            .put("accuracyMeters", ping.accuracyMeters)
-            .toString()
-
-        val uniqueKey = "ping_${ping.timestamp}_${UUID.randomUUID()}"
-
-        editor.putString(uniqueKey, dataString)
-        editor.apply()
-    }
-
-    fun getAllStoredPings(): List<TelemetryPing> {
-        val allEntries = prefs.all
-        val pings = mutableListOf<TelemetryPing>()
-        
-        allEntries.forEach { (_, value) ->
-            if (value is String) {
-                try {
-                    val json = JSONObject(value)
-                    pings.add(
-                        TelemetryPing(
-                            deviceId = json.getString("deviceId"),
-                            storeId = json.getString("storeId"),
-                            itemId = json.getString("itemId"),
-                            triggerType = json.getString("triggerType"),
-                            timestamp = json.getLong("timestamp"),
-                            lat = json.getDouble("lat"),
-                            lng = json.getDouble("lng"),
-                            accuracyMeters = json.getDouble("accuracyMeters").toFloat()
-                        )
-                    )
-                } catch (e: Exception) {
-                    // Skip malformed entries
-                }
+        scope.launch {
+            try {
+                telemetryDao.insertPing(entity)
+                Log.d("TelemetryManager", "Ping cached offline: ${ping.timestamp}")
+            } catch (e: Exception) {
+                Log.e("TelemetryManager", "Failed to insert ping into Room", e)
             }
         }
-        return pings
+    }
+
+    /**
+     * Retrieves all stored pings from the database.
+     */
+    suspend fun getAllStoredPings(): List<TelemetryEntity> {
+        return telemetryDao.getAllPings()
+    }
+
+    /**
+     * Deletes a list of pings from the database.
+     */
+    suspend fun deletePings(pings: List<TelemetryEntity>) {
+        telemetryDao.deletePings(pings)
+    }
+
+    /**
+     * Clears all cached pings.
+     */
+    suspend fun clearCache() {
+        telemetryDao.clearCache()
     }
 }

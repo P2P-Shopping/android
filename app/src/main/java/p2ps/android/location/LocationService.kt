@@ -1,33 +1,37 @@
 package p2ps.android.location
 
-import android.annotation.SuppressLint
-import android.app.*
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.Location
+import android.os.Build
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import android.content.pm.ServiceInfo
-import android.os.Build
 import androidx.core.content.ContextCompat
-import android.Manifest
-import android.content.pm.PackageManager
-import android.util.Log
 import com.google.android.gms.location.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import p2ps.android.R
-import java.util.concurrent.TimeUnit
+import p2ps.android.ApiClient
 import p2ps.android.MainActivity
-import p2ps.android.HardwareManager
+import p2ps.android.R
+import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
-import p2ps.android.ApiClient
-import p2ps.android.core.TelemetryDispatcher
 
 class LocationService : Service() {
 
@@ -39,19 +43,24 @@ class LocationService : Service() {
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private lateinit var hardwareManager: HardwareManager
 
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
     private var currentItemId = "unknown"
+    
+    private lateinit var sensorManager: SensorManager
+    private var accelerometer: Sensor? = null
+    private var isMoving = true
+    private var lastMoveTime = 0L
+    private val INTERVAL_MOVING = 5000L
+    private val INTERVAL_STATIONARY = 30000L
+    private var currentInterval = INTERVAL_MOVING
 
     override fun onCreate() {
         super.onCreate()
 
         telemetryManager = TelemetryManager(this)
         telemetryDispatcher = TelemetryDispatcher(ApiClient(this), telemetryManager)
-        hardwareManager = HardwareManager(telemetryDispatcher, serviceScope)
-        hardwareManager.initialize()
         
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
@@ -64,14 +73,21 @@ class LocationService : Service() {
         }
 
         createNotificationChannel()
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        accelerometer?.let {
+            sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
     }
 
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
-            TimeUnit.SECONDS.toMillis(10)
+            currentInterval
         ).apply {
-            setMinUpdateIntervalMillis(TimeUnit.SECONDS.toMillis(5))
+            setMaxUpdateDelayMillis(currentInterval)
+            setMinUpdateIntervalMillis(currentInterval)
         }.build()
 
         try {
@@ -81,13 +97,12 @@ class LocationService : Service() {
                 Looper.getMainLooper()
             )
         } catch (e: SecurityException) {
-            Log.e("LocationService", "Missing location permission at update time", e)
-            stopSelf()
+            Log.e("LocationService", "Missing permissions", e)
         }
     }
 
     private fun processNewLocation(location: Location) {
-        Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
+        Log.d("TelemetryService", "New telemetry ping generated at ${location.time} (isMoving: $isMoving)")
         val ping = TelemetryPing(
             deviceId = currentDeviceId,
             storeId = currentStoreId,
@@ -99,11 +114,6 @@ class LocationService : Service() {
             timestamp = System.currentTimeMillis()
         )
 
-        // Logica de pe branch-ul main
-        telemetryManager.savePing(ping)
-        hardwareManager.handleHardwareTrigger(ping)
-
-        // Logica de pe branch-ul feature
         serviceScope.launch {
             telemetryDispatcher.dispatch(ping)
         }
@@ -163,7 +173,7 @@ class LocationService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Background location tracking for telemetry"
-                setShowBadge(true) //bulina aplicatie
+                setShowBadge(true)
             }
             manager.createNotificationChannel(channel)
         }
@@ -171,8 +181,61 @@ class LocationService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private val sensorListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+
+            val movingNow = calculateIsMoving(x, y, z)
+            val currentTime = System.currentTimeMillis()
+            val moveDebounceMs = 2000L
+
+            if (movingNow) {
+                if (lastMoveTime == 0L) lastMoveTime = currentTime
+                if (!isMoving && currentTime - lastMoveTime > moveDebounceMs) {
+                    isMoving = true
+                    Log.d("TelemetryService", "Motion detected – switching to 5s")
+                    updateLocationInterval()
+                }
+                if (isMoving) lastMoveTime = currentTime
+            } else {
+                if (isMoving && (currentTime - lastMoveTime > moveDebounceMs)) {
+                    isMoving = false
+                    Log.d("TelemetryService", "Stationary – switching to 30s")
+                    updateLocationInterval()
+                } else if (!isMoving) {
+                    lastMoveTime = currentTime 
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+            // Not needed for this implementation
+        }
+    }
+
+    private fun updateLocationInterval() {
+        val newInterval = if (isMoving) INTERVAL_MOVING else INTERVAL_STATIONARY
+
+        if (currentInterval == newInterval) return
+
+        currentInterval = newInterval
+        Log.d("TelemetryService", "Interval changed to: ${currentInterval/1000}s")
+
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        startLocationUpdates()
+    }
+
+    fun calculateIsMoving(x: Float, y: Float, z: Float): Boolean {
+        val magnitude = kotlin.math.sqrt((x * x + y * y + z * z).toDouble())
+        val acceleration = kotlin.math.abs(magnitude - 9.81)
+        return acceleration > 0.5
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallback)
+        sensorManager.unregisterListener(sensorListener)
     }
 }

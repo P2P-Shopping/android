@@ -4,11 +4,11 @@ import android.util.Log
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
-import io.mockk.verify
+import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import org.junit.Assert.*
 import p2ps.android.data.TelemetryPing
 
 class ApiClientTest {
@@ -30,9 +30,9 @@ class ApiClientTest {
     fun setup() {
         mockkStatic(Log::class)
         every { Log.i(any<String>(), any<String>()) } returns 0
+        every { Log.e(any<String>(), any<String>()) } returns 0
         every { Log.d(any<String>(), any<String>()) } returns 0
         every { Log.w(any<String>(), any<String>()) } returns 0
-        every { Log.e(any<String>(), any<String>()) } returns 0
     }
 
     @After
@@ -41,70 +41,59 @@ class ApiClientTest {
     }
 
     @Test
-    fun `sendPing returns true for current simulation`() {
+    fun sendPing_returnsBoolean() = runBlocking {
         val result = apiClient.sendPing(testPing)
-        assertTrue("sendPing should return true in simulation mode", result)
-    }
-
-    @Test
-    fun `sendPing returns Boolean type`() {
-        val result = apiClient.sendPing(testPing)
-        // Result is a primitive boolean - just verifying type contract
+        // Result must be a Boolean (compile-time guaranteed, but confirms the API contract)
         assertTrue(result is Boolean)
     }
 
     @Test
-    fun `sendPing accepts ping with zero coordinates`() {
-        val zeroPing = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 0f, 0L)
-        val result = apiClient.sendPing(zeroPing)
-        assertTrue(result)
+    fun sendPing_overManyInvocations_returnsBothTrueAndFalse() = runBlocking {
+        // simulateNetworkSuccess() returns true ~80% of the time (Random.nextFloat() > 0.2f)
+        // Over 200 invocations the probability of all being true or all false is negligible
+        val results = (1..200).map { apiClient.sendPing(testPing) }
+        assertTrue("Expected at least one success", results.any { it })
+        assertTrue("Expected at least one failure", results.any { !it })
     }
 
     @Test
-    fun `sendPing accepts ping with boundary coordinates`() {
-        val boundaryPing = TelemetryPing("d", "s", "i", "t", 90.0, 180.0, 1f, 0L)
-        val result = apiClient.sendPing(boundaryPing)
-        assertTrue(result)
+    fun sendPing_successRate_isApproximately80Percent() = runBlocking {
+        // Expected success rate is ~80% (threshold > 0.2f).
+        // With 500 samples the observed rate should be between 70% and 90%.
+        val n = 500
+        val successes = (1..n).count { apiClient.sendPing(testPing) }
+        val rate = successes.toDouble() / n
+        assertTrue(
+            "Success rate $rate is outside expected range [0.70, 0.90]",
+            rate in 0.70..0.90
+        )
     }
 
     @Test
-    fun `sendPing accepts ping with negative coordinates`() {
-        val southPing = TelemetryPing("d", "s", "i", "BACKGROUND", -33.8688, -70.6693, 5f, 0L)
-        val result = apiClient.sendPing(southPing)
-        assertTrue(result)
+    fun sendPing_withMinimalPing_doesNotThrow() = runBlocking {
+        val minimalPing = TelemetryPing("", "", "", "", 0.0, 0.0, 0f, 0L)
+        // Must not throw regardless of ping content
+        val result = apiClient.sendPing(minimalPing)
+        assertTrue(result is Boolean)
     }
 
     @Test
-    fun `sendPing logs info about POST endpoint`() {
-        apiClient.sendPing(testPing)
-        verify { Log.i("ApiClient", "POST /api/telemetry/ping") }
+    fun sendPing_withExtremeCoordinates_doesNotThrow() = runBlocking {
+        val extremePing = TelemetryPing("d", "s", "i", "t", -90.0, -180.0, 0f, Long.MAX_VALUE)
+        val result = apiClient.sendPing(extremePing)
+        assertTrue(result is Boolean)
     }
 
     @Test
-    fun `sendPing logs acceptance on success`() {
-        apiClient.sendPing(testPing)
-        verify { Log.i("ApiClient", "Simulation: Telemetry accepted (202 Accepted)") }
-    }
-
-    @Test
-    fun `sendPing accepts ping with MANUAL trigger type`() {
-        val manualPing = testPing.copy(triggerType = "MANUAL")
-        val result = apiClient.sendPing(manualPing)
-        assertTrue(result)
-    }
-
-    @Test
-    fun `sendPing accepts ping with STARTUP_AUTO_SCAN trigger type`() {
-        val startupPing = testPing.copy(triggerType = "STARTUP_AUTO_SCAN")
-        val result = apiClient.sendPing(startupPing)
-        assertTrue(result)
-    }
-
-    @Test
-    fun `sendPing called multiple times always returns true`() {
-        repeat(5) {
-            val result = apiClient.sendPing(testPing.copy(timestamp = it.toLong()))
-            assertTrue("sendPing should return true on call #$it", result)
+    fun sendPing_differentPings_returnBoolean() = runBlocking {
+        val pings = listOf(
+            testPing.copy(itemId = "a", timestamp = 1L),
+            testPing.copy(itemId = "b", timestamp = 2L),
+            testPing.copy(itemId = "c", timestamp = 3L)
+        )
+        pings.forEach { ping ->
+            val result = apiClient.sendPing(ping)
+            assertTrue(result is Boolean)
         }
     }
 }

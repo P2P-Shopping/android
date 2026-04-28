@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.ui.theme.P2PSAndroidTheme
@@ -31,7 +32,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private val hardwareManager = HardwareManager()
+    private lateinit var hardwareManager: HardwareManager
 
     // Handles permissions and UI/State updates ONLY.
     private val requestPermissionLauncher = registerForActivityResult(
@@ -77,6 +78,10 @@ class MainActivity : ComponentActivity() {
 
         telemetryManager = TelemetryManager(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
+        val apiClient = ApiClient()
+        val telemetryDispatcher = TelemetryDispatcher(apiClient, telemetryManager)
+        hardwareManager = HardwareManager(telemetryDispatcher)
         
         // Initialize Hardware SDK
         hardwareManager.initialize()

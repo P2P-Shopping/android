@@ -1,45 +1,32 @@
 package p2ps.android
 
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.TelemetryPing
 
 /**
  * Manages interactions with physical hardware and coordinates telemetry dispatch.
+ * Uses Kotlin Coroutines for safe, non-blocking asynchronous execution.
  */
-class HardwareManager {
+class HardwareManager(
+    private val telemetryDispatcher: TelemetryDispatcher,
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
+) {
     private val TAG = "HardwareManager"
     private var isInitialized = false
 
-    private val apiClient = ApiClient()
-
-    // 1. Initializing the SDK
     fun initialize() {
         if (isInitialized) return
-
-        Log.d(TAG, "Initializing Hardware SDK Scaffolding...")
-
-        if (connectToDevice()) {
-            isInitialized = true
-        } else {
-            Log.e(TAG, "Hardware SDK initialization failed.")
-        }
-    }
-
-    private fun connectToDevice(): Boolean {
-        return try {
-            Log.d(TAG, "Attempting to connect to hardware API...")
-            Log.i(TAG, "Hardware connection established successfully.")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Hardware connection failed.", e)
-            false
-        }
+        Log.d(TAG, "Initializing Hardware SDK...")
+        isInitialized = true
     }
 
     /**
-     * Handles the hardware trigger by dispatching the ping to the backend.
-     * Task #149
-     * Note: Location is now passed from the caller to ensure freshness and permissions.
+     * Handles hardware triggers. Dispatches the ping on a background coroutine
+     * to prevent NetworkOnMainThreadException and UI freezes.
      */
     fun handleHardwareTrigger(ping: TelemetryPing) {
         if (!isInitialized) {
@@ -47,12 +34,15 @@ class HardwareManager {
             return
         }
 
-        Log.i(TAG, "Hardware Trigger Detected for item: ${ping.itemId}")
-        apiClient.sendPing(ping)
+        Log.i(TAG, "Hardware Trigger Detected: ${ping.itemId}")
+        
+        // Lansăm o corutină pe un thread de fundal
+        scope.launch {
+            telemetryDispatcher.dispatch(ping)
+        }
     }
 
-    // Deprecated raw trigger for backward compatibility or direct simulation without location
     fun handleHardwareTrigger(storeId: String, itemId: String, triggerType: String = "BUTTON_PRESS") {
-        Log.w(TAG, "Manual trigger received without location. Pings should be created via MainActivity.")
+        Log.w(TAG, "Manual trigger received without location.")
     }
 }

@@ -20,7 +20,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Load the API Key from local.properties
+        // Încarcă API_KEY din local.properties pentru securitate
         val properties = Properties()
         val localPropertiesFile = project.rootProject.file("local.properties")
         if (localPropertiesFile.exists()) {
@@ -48,45 +48,6 @@ android {
         compose = true
         buildConfig = true
     }
-
-    sonar {
-        properties {
-            property("sonar.projectName", "P2P Shopping Android")
-            property("sonar.projectKey", "p2ps-android")
-            property("sonar.host.url", "http://localhost:9000")
-            property("sonar.sources", "src/main/java")
-            property("sonar.tests", "src/test/java")
-            property("sonar.java.binaries", "build/tmp/kotlin-classes/debug")
-            property("sonar.junit.reportPaths", "build/test-results/testDebugUnitTest")
-            property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/testDebugUnitTestCoverage/testDebugUnitTestCoverage.xml")
-        }
-    }
-}
-
-tasks.register<JacocoReport>("testDebugUnitTestCoverage") {
-    dependsOn("testDebugUnitTest")
-    group = "Reporting"
-    description = "Generate Jacoco coverage reports for the debug build."
-
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-    }
-
-    val fileFilter = listOf(
-        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*",
-        "**/*Test*.*", "android/**/*.*"
-    )
-    val debugTree = fileTree("${project.layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
-        exclude(fileFilter)
-    }
-    val mainSrc = "${project.projectDir}/src/main/java"
-
-    sourceDirectories.setFrom(files(mainSrc))
-    classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(fileTree("${project.layout.buildDirectory.get()}") {
-        include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
-    })
 }
 
 dependencies {
@@ -95,8 +56,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     
     // Retrofit & OkHttp
@@ -104,15 +63,19 @@ dependencies {
     implementation(libs.retrofit.converter.gson) 
     implementation(libs.okhttp.logging)
     
-    // Location Services
+    // Location
     implementation(libs.play.services.location)
 
-    // Testing
+    // Testare
     testImplementation(libs.junit)
+    testImplementation("io.mockk:mockk:1.13.5")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+tasks.withType<Test> {
+    configure<JacocoTaskExtension> {
+        isIncludeNoLocationClasses = true
+        excludes = listOf("jdk.internal.*")
+    }
 }

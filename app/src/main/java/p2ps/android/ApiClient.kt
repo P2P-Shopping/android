@@ -1,35 +1,40 @@
 package p2ps.android
 
+import android.content.Context
 import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import p2ps.android.data.TelemetryBatch
 import p2ps.android.data.TelemetryPing
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.UUID
 
-class ApiClient {
+class ApiClient(context: Context) {
     companion object {
         private const val TAG = "ApiClient"
         private const val BASE_URL = "http://10.0.2.2:8081/api/"
     }
 
     private val apiService: ApiService
+    private val deviceId: String
 
     init {
+        // Generăm sau recuperăm un ID unic pentru acest telefon
+        val prefs = context.getSharedPreferences("p2ps_prefs", Context.MODE_PRIVATE)
+        deviceId = prefs.getString("DEVICE_ID", null) ?: UUID.randomUUID().toString().also {
+            prefs.edit().putString("DEVICE_ID", it).apply()
+        }
+
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         }
 
-        // We add the Header interceptor FIRST, and Logging LAST
-        // so we can see the final headers in the Logcat.
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .addHeader("X-API-Key", BuildConfig.API_KEY)
+                    .addHeader("X-API-Key", BuildConfig.API_KEY) // Din local.properties
+                    .addHeader("X-Device-Id", deviceId)          // Dinamic per dispozitiv
                     .build()
                 chain.proceed(request)
             }
@@ -45,39 +50,30 @@ class ApiClient {
         apiService = retrofit.create(ApiService::class.java)
     }
 
-    fun sendPing(ping: TelemetryPing) {
-        Log.d(TAG, "Dispatching telemetry to Spring Server: ${ping.itemId}")
-
-        apiService.sendPing(ping.deviceId, ping).enqueue(object : Callback<Unit> {
-            override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
-                if (response.isSuccessful || response.code() == 202) {
-                    Log.i(TAG, "Telemetry synced successfully (HTTP ${response.code()})")
-                } else {
-                    Log.e(TAG, "Server rejected telemetry: ${response.code()}")
-                    val errorBody = response.errorBody()?.string()
-                    if (errorBody != null) {
-                        Log.e(TAG, "Error body: $errorBody")
-                    }
-                }
+    suspend fun sendPing(ping: TelemetryPing): Boolean {
+        return try {
+            Log.d(TAG, "Trimitere telemetrie pentru: ${ping.itemId}")
+            val response = apiService.sendPing(ping)
+            if (response.isSuccessful || response.code() == 202) {
+                Log.i(TAG, "Succes: ${response.code()}")
+                true
+            } else {
+                Log.e(TAG, "Eroare server: ${response.code()}")
+                false
             }
-
-            override fun onFailure(call: Call<Unit>, t: Throwable) {
-                Log.e(TAG, "Network error: ${t.message}")
-            }
-        })
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare rețea: ${e.message}")
+            false
+        }
     }
 
-    fun sendBatch(pings: List<TelemetryPing>) {
-        val batch = TelemetryBatch(pings)
-        apiService.sendBatchPings(batch).enqueue(object : Callback<Unit> {
-            override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
-                if (response.isSuccessful || response.code() == 202) {
-                    Log.i(TAG, "Batch synced successfully")
-                }
-            }
-            override fun onFailure(call: Call<Unit>, t: Throwable) {
-                Log.e(TAG, "Batch sync failed: ${t.message}")
-            }
-        })
+    suspend fun sendBatch(pings: List<TelemetryPing>): Boolean {
+        return try {
+            val response = apiService.sendBatchPings(TelemetryBatch(pings))
+            response.isSuccessful || response.code() == 202
+        } catch (e: Exception) {
+            Log.e(TAG, "Eroare batch: ${e.message}")
+            false
+        }
     }
 }

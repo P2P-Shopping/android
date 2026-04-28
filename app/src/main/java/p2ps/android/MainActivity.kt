@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -22,6 +23,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.R
@@ -31,16 +33,26 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private val hardwareManager = HardwareManager()
+    private lateinit var hardwareManager: HardwareManager
 
     // Handles permissions and UI/State updates ONLY.
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val notificationsGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            permissions[Manifest.permission.POST_NOTIFICATIONS] == true
-        } else true
+        val fineGranted =
+            permissions[Manifest.permission.ACCESS_FINE_LOCATION]
+                ?: (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED)
+        val notificationsGranted =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                permissions[Manifest.permission.POST_NOTIFICATIONS]
+                    ?: (ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED)
+            } else true
 
         if (fineGranted) {
             Toast.makeText(this, "Location access granted!", Toast.LENGTH_SHORT).show()
@@ -67,11 +79,17 @@ class MainActivity : ComponentActivity() {
 
         telemetryManager = TelemetryManager(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
+        val apiClient = ApiClient(this)
+        val telemetryDispatcher = TelemetryDispatcher(apiClient, telemetryManager)
+        hardwareManager = HardwareManager(telemetryDispatcher)
         
         // Initialize Hardware SDK
         hardwareManager.initialize()
 
-        checkLocationPermission()
+        if (savedInstanceState == null) {
+            checkLocationPermission()
+        }
 
         enableEdgeToEdge()
         setContent {
@@ -84,14 +102,19 @@ class MainActivity : ComponentActivity() {
                                 ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
                             } else true
 
-                            if (fineLocation == PackageManager.PERMISSION_GRANTED && notificationsGranted) {
+                            if (fineLocation == PackageManager.PERMISSION_GRANTED) {
+
+                                if (!notificationsGranted) {
+                                    Toast.makeText(this, "Telemetry active (without notifications)", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(this, "Telemetry Started", Toast.LENGTH_SHORT).show()
+                                }
+
                                 onHardwareTriggerReceived("store_ABC", "item_123")
                                 startLocationTrackingService()
-                                Toast.makeText(this, "Telemetry Started", Toast.LENGTH_SHORT).show()
+
                             } else {
-                                val message = if (!notificationsGranted) "Notification permission is required for background tracking"
-                                else "Please allow location to simulate trigger"
-                                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, "Please allow location to simulate trigger", Toast.LENGTH_SHORT).show()
                                 checkLocationPermission()
                             }
                         },

@@ -7,11 +7,13 @@ import kotlinx.coroutines.*
 /**
  * Manages interactions with physical hardware and coordinates telemetry dispatch.
  */
-class HardwareManager {
+class HardwareManager(
+    private val externalScope: CoroutineScope? = null,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val apiClient: ApiClient = ApiClient() // Îl mutăm aici în constructor
+) {
     private val TAG = "HardwareManager"
     private var isInitialized = false
-
-    private val apiClient = ApiClient()
 
     // 1. Initializing the SDK
     fun initialize() {
@@ -49,7 +51,9 @@ class HardwareManager {
         }
 
         Log.i(TAG, "Hardware Trigger Detected for item: ${ping.itemId}")
-        CoroutineScope(Dispatchers.IO).launch {
+        val scope = externalScope ?: CoroutineScope(dispatcher)
+
+        scope.launch {
             try {
                 apiClient.sendPing(ping)
             } catch (e: Exception) {

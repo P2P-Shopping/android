@@ -182,11 +182,9 @@ class LocationService : Service() {
             val y = event.values[1]
             val z = event.values[2]
 
-            val magnitude = sqrt((x * x + y * y + z * z).toDouble())
-            val acceleration = abs(magnitude - 9.81)
+            val movingNow = calculateIsMoving(x, y, z)
             val currentTime = System.currentTimeMillis()
 
-            val movingNow = acceleration > 0.5
 
             val MOVE_DEBOUNCE_MS = 2000L
 
@@ -224,6 +222,17 @@ class LocationService : Service() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
         startLocationUpdates()
     }
+    // Acestea sunt funcțiile pe care testul le va "vedea" și le va măsura
+    fun calculateIsMoving(x: Float, y: Float, z: Float): Boolean {
+        val magnitude = kotlin.math.sqrt((x * x + y * y + z * z).toDouble())
+        val acceleration = kotlin.math.abs(magnitude - 9.81)
+        return acceleration > 0.5
+    }
+
+    fun getNextInterval(isMovingNow: Boolean): Long {
+        return if (isMovingNow) INTERVAL_MOVING else INTERVAL_STATIONARY
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()

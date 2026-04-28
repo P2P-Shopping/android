@@ -11,6 +11,6 @@ data class TelemetryPing(
     val triggerType: String,
     val lat: Double,
     val lng: Double,
-    val accuracy: Float,
+    val accuracyMeters: Float,
     val timestamp: Long
 )

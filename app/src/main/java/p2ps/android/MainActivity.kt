@@ -38,13 +38,27 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        val notificationsGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permissions[Manifest.permission.POST_NOTIFICATIONS] == true
+        } else true
 
-        if (fineGranted || coarseGranted) {
-            Toast.makeText(this, getString(R.string.location_permission_granted), Toast.LENGTH_SHORT).show()
+        if (fineGranted) {
+            Toast.makeText(this, "Location access granted!", Toast.LENGTH_SHORT).show()
+            startLocationTrackingService()
+
+            onHardwareTriggerReceived(
+                storeId = "Lidl_01",
+                itemId = "Mere_Golden_05",
+                triggerType = "STARTUP_AUTO_SCAN"
+            )
+            if (!notificationsGranted) {
+                Toast.makeText(this, "Notifications disabled. Service will run silently.", Toast.LENGTH_LONG).show()
+            }
             sendResultToWeb("Granted")
+
         } else {
-            Toast.makeText(this, getString(R.string.location_permission_denied), Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Permission denied. Please enable from settings.", Toast.LENGTH_LONG).show()
+            sendResultToWeb("Denied")
         }
     }
 
@@ -59,22 +73,27 @@ class MainActivity : ComponentActivity() {
 
         checkLocationPermission()
 
-        if (savedInstanceState == null) {
-            // Task #149: Simulation of a startup hardware trigger
-            onHardwareTriggerReceived(
-                storeId = "Lidl_01",
-                itemId = "Mere_Golden_05",
-                triggerType = "STARTUP_AUTO_SCAN"
-            )
-        }
-
         enableEdgeToEdge()
         setContent {
             P2PSAndroidTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     WelcomeScreen(
                         onTriggerClick = {
-                            onHardwareTriggerReceived("store_ABC", "item_123")
+                            val fineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                            val notificationsGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                            } else true
+
+                            if (fineLocation == PackageManager.PERMISSION_GRANTED && notificationsGranted) {
+                                onHardwareTriggerReceived("store_ABC", "item_123")
+                                startLocationTrackingService()
+                                Toast.makeText(this, "Telemetry Started", Toast.LENGTH_SHORT).show()
+                            } else {
+                                val message = if (!notificationsGranted) "Notification permission is required for background tracking"
+                                else "Please allow location to simulate trigger"
+                                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                                checkLocationPermission()
+                            }
                         },
                         modifier = Modifier.padding(innerPadding)
                     )
@@ -84,24 +103,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkLocationPermission() {
-        val fineGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+        val permissions = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
 
-        if (fineGranted || coarseGranted) {
-            sendResultToWeb("Granted")
-            return
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        requestPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
+            sendResultToWeb("Granted")
+            startLocationTrackingService()
+            return
+        }
+        requestPermissionLauncher.launch(missing.toTypedArray())
     }
 
     /**
@@ -119,7 +138,6 @@ class MainActivity : ComponentActivity() {
 
         if (!hasFineLocation && !hasCoarseLocation) {
             println("Telemetry Error: Cannot trigger ping, location permissions are missing.")
-            Toast.makeText(this, "Location permission missing for telemetry", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -134,7 +152,7 @@ class MainActivity : ComponentActivity() {
                         triggerType = triggerType,
                         lat = location.latitude,
                         lng = location.longitude,
-                        accuracy = location.accuracy,
+                        accuracyMeters = location.accuracy,
                         timestamp = System.currentTimeMillis()
                     )
                     
@@ -173,6 +191,15 @@ class MainActivity : ComponentActivity() {
             runOnUiThread { checkLocationPermission() }
         }
     }
+
+    private fun startLocationTrackingService() {
+        val intent = android.content.Intent(this, p2ps.android.location.LocationService::class.java).apply {
+            putExtra("EXTRA_DEVICE_ID", "usr_DEMO")
+            putExtra("EXTRA_STORE_ID", "Lidl_01")
+            putExtra("EXTRA_ITEM_ID", "Background_Track")
+        }
+        startForegroundService(intent)
+    }
 }
 
 @Composable
@@ -190,7 +217,7 @@ fun WelcomeScreen(onTriggerClick: () -> Unit, modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onTriggerClick) {
-            Text("Simulate Hardware Trigger")
+            Text("Hardware Trigger")
         }
     }
 }

@@ -29,9 +29,7 @@ class ApiClient {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    // Matching exactly what works in Postman, using BuildConfig for security
                     .addHeader("X-API-Key", BuildConfig.API_KEY)
-                    .addHeader("X-Device-Id", BuildConfig.API_KEY)
                     .build()
                 chain.proceed(request)
             }
@@ -50,12 +48,16 @@ class ApiClient {
     fun sendPing(ping: TelemetryPing) {
         Log.d(TAG, "Dispatching telemetry to Spring Server: ${ping.itemId}")
 
-        apiService.sendPing(ping).enqueue(object : Callback<Unit> {
+        apiService.sendPing(ping.deviceId, ping).enqueue(object : Callback<Unit> {
             override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
                 if (response.isSuccessful || response.code() == 202) {
                     Log.i(TAG, "Telemetry synced successfully (HTTP ${response.code()})")
                 } else {
                     Log.e(TAG, "Server rejected telemetry: ${response.code()}")
+                    val errorBody = response.errorBody()?.string()
+                    if (errorBody != null) {
+                        Log.e(TAG, "Error body: $errorBody")
+                    }
                 }
             }
 

@@ -2,6 +2,7 @@ package p2ps.android
 
 import android.util.Log
 import p2ps.android.data.TelemetryPing
+import kotlinx.coroutines.*
 
 /**
  * Manages interactions with physical hardware and coordinates telemetry dispatch.
@@ -48,7 +49,13 @@ class HardwareManager {
         }
 
         Log.i(TAG, "Hardware Trigger Detected for item: ${ping.itemId}")
-        apiClient.sendPing(ping)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                apiClient.sendPing(ping)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send ping from hardware trigger", e)
+            }
+        }
     }
 
     // Deprecated raw trigger for backward compatibility or direct simulation without location

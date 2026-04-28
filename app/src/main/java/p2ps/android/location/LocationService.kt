@@ -188,19 +188,23 @@ class LocationService : Service() {
 
             val movingNow = acceleration > 0.5
 
-            if (movingNow) {
-                lastMoveTime = currentTime
+            val MOVE_DEBOUNCE_MS = 2000L
 
-                if (!isMoving) {
+            if (movingNow) {
+                if (lastMoveTime == 0L) lastMoveTime = currentTime
+                if (!isMoving && currentTime - lastMoveTime > MOVE_DEBOUNCE_MS) {
                     isMoving = true
-                    Log.d("TelemetryService", "DETECTAT MIȘCARE - Trecem la 5s")
+                    Log.d("TelemetryService", "Motion detected – switching to 5s")
                     updateLocationInterval()
                 }
+                if (isMoving) lastMoveTime = currentTime
             } else {
-                if (isMoving && (currentTime - lastMoveTime > 2000)) {
+                if (isMoving && (currentTime - lastMoveTime > MOVE_DEBOUNCE_MS)) {
                     isMoving = false
-                    Log.d("TelemetryService", "STARE REPAUS - Trecem la 30s")
+                    Log.d("TelemetryService", "Stationary – switching to 30s")
                     updateLocationInterval()
+                } else if (!isMoving) {
+                    lastMoveTime = currentTime // reset accumulator while stationary
                 }
             }
         }

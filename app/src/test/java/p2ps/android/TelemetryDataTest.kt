@@ -2,9 +2,12 @@ package p2ps.android
 
 import org.junit.Test
 import org.junit.Assert.*
+import p2ps.android.data.TelemetryEntity
 import p2ps.android.data.TelemetryPing
 
 class TelemetryDataTest {
+
+    // ── TelemetryPing ──────────────────────────────────────────────────────────
 
     @Test
     fun telemetryPing_isCorrect() {
@@ -31,5 +34,161 @@ class TelemetryDataTest {
         val ping = TelemetryPing("d", "s", "i", "t", 90.0, 180.0, 1f, 0L)
         assertTrue("Latitude must be within [-90, 90]", ping.lat in -90.0..90.0)
         assertTrue("Longitude must be within [-180, 180]", ping.lng in -180.0..180.0)
+    }
+
+    @Test
+    fun telemetryPing_negativeCoordinates_areValid() {
+        val ping = TelemetryPing("d", "s", "i", "t", -90.0, -180.0, 1f, 0L)
+        assertTrue(ping.lat in -90.0..90.0)
+        assertTrue(ping.lng in -180.0..180.0)
+    }
+
+    @Test
+    fun telemetryPing_equality_sameValues() {
+        val ping1 = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
+        val ping2 = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
+        assertEquals(ping1, ping2)
+    }
+
+    @Test
+    fun telemetryPing_equality_differentTimestamp() {
+        val ping1 = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
+        val ping2 = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 2000L)
+        assertNotEquals(ping1, ping2)
+    }
+
+    @Test
+    fun telemetryPing_copy_changesOnlySpecifiedField() {
+        val original = TelemetryPing("dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
+        val copy = original.copy(itemId = "new_item")
+        assertEquals("new_item", copy.itemId)
+        assertEquals(original.deviceId, copy.deviceId)
+        assertEquals(original.storeId, copy.storeId)
+        assertEquals(original.timestamp, copy.timestamp)
+    }
+
+    @Test
+    fun telemetryPing_zeroTimestamp_isAccepted() {
+        val ping = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 0f, 0L)
+        assertEquals(0L, ping.timestamp)
+    }
+
+    @Test
+    fun telemetryPing_emptyStrings_areAccepted() {
+        val ping = TelemetryPing("", "", "", "", 0.0, 0.0, 0f, 0L)
+        assertEquals("", ping.deviceId)
+        assertEquals("", ping.storeId)
+        assertEquals("", ping.itemId)
+        assertEquals("", ping.triggerType)
+    }
+
+    @Test
+    fun telemetryPing_accuracyZero_isValid() {
+        val ping = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 0f, 1L)
+        assertEquals(0f, ping.accuracy, 0.0001f)
+    }
+
+    @Test
+    fun telemetryPing_maxLongTimestamp_isAccepted() {
+        val ping = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 1f, Long.MAX_VALUE)
+        assertEquals(Long.MAX_VALUE, ping.timestamp)
+    }
+
+    // ── TelemetryEntity ────────────────────────────────────────────────────────
+
+    @Test
+    fun telemetryEntity_defaultId_isZero() {
+        val entity = TelemetryEntity(
+            deviceId = "dev", storeId = "store", itemId = "item",
+            triggerType = "BACKGROUND", latitude = 44.0, longitude = 26.0,
+            accuracy = 5f, timestamp = 1000L
+        )
+        assertEquals(0, entity.id)
+    }
+
+    @Test
+    fun telemetryEntity_customId_isPreserved() {
+        val entity = TelemetryEntity(
+            id = 42,
+            deviceId = "dev", storeId = "store", itemId = "item",
+            triggerType = "BACKGROUND", latitude = 44.0, longitude = 26.0,
+            accuracy = 5f, timestamp = 1000L
+        )
+        assertEquals(42, entity.id)
+    }
+
+    @Test
+    fun telemetryEntity_equality_sameValues() {
+        val e1 = TelemetryEntity(1, "dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
+        val e2 = TelemetryEntity(1, "dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
+        assertEquals(e1, e2)
+    }
+
+    @Test
+    fun telemetryEntity_equality_differentId() {
+        val e1 = TelemetryEntity(1, "dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
+        val e2 = TelemetryEntity(2, "dev", "store", "item", "TYPE", 1.0, 2.0, 0.5f, 1000L)
+        assertNotEquals(e1, e2)
+    }
+
+    @Test
+    fun telemetryEntity_usesLatitudeLongitude_notLatLng() {
+        val entity = TelemetryEntity(
+            deviceId = "dev", storeId = "store", itemId = "item",
+            triggerType = "T", latitude = 55.7558, longitude = 37.6173,
+            accuracy = 3f, timestamp = 500L
+        )
+        assertEquals(55.7558, entity.latitude, 0.0001)
+        assertEquals(37.6173, entity.longitude, 0.0001)
+    }
+
+    // ── TelemetryPing → TelemetryEntity field mapping ─────────────────────────
+
+    @Test
+    fun telemetryPing_to_telemetryEntity_fieldMapping() {
+        val ping = TelemetryPing(
+            deviceId = "mapped_dev",
+            storeId = "mapped_store",
+            itemId = "mapped_item",
+            triggerType = "SCAN",
+            lat = 48.8566,
+            lng = 2.3522,
+            accuracy = 7.3f,
+            timestamp = 999888777L
+        )
+        // Replicate the mapping done in TelemetryManager.savePing
+        val entity = TelemetryEntity(
+            deviceId = ping.deviceId,
+            storeId = ping.storeId,
+            itemId = ping.itemId,
+            triggerType = ping.triggerType,
+            latitude = ping.lat,
+            longitude = ping.lng,
+            accuracy = ping.accuracy,
+            timestamp = ping.timestamp
+        )
+
+        assertEquals(ping.deviceId, entity.deviceId)
+        assertEquals(ping.storeId, entity.storeId)
+        assertEquals(ping.itemId, entity.itemId)
+        assertEquals(ping.triggerType, entity.triggerType)
+        assertEquals(ping.lat, entity.latitude, 0.0001)
+        assertEquals(ping.lng, entity.longitude, 0.0001)
+        assertEquals(ping.accuracy, entity.accuracy, 0.0001f)
+        assertEquals(ping.timestamp, entity.timestamp)
+    }
+
+    @Test
+    fun telemetryPing_lat_mapsTo_entity_latitude_not_longitude() {
+        val ping = TelemetryPing("d", "s", "i", "t", lat = 10.0, lng = 20.0, accuracy = 1f, timestamp = 0L)
+        val entity = TelemetryEntity(
+            deviceId = ping.deviceId, storeId = ping.storeId, itemId = ping.itemId,
+            triggerType = ping.triggerType, latitude = ping.lat, longitude = ping.lng,
+            accuracy = ping.accuracy, timestamp = ping.timestamp
+        )
+        assertEquals(10.0, entity.latitude, 0.0001)
+        assertEquals(20.0, entity.longitude, 0.0001)
+        // Ensure they're not swapped
+        assertNotEquals(entity.latitude, entity.longitude, 0.0001)
     }
 }

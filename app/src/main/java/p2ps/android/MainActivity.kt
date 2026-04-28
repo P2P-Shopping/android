@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
         telemetryManager = TelemetryManager(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
-        val apiClient = ApiClient()
+        val apiClient = ApiClient(this)
         val telemetryDispatcher = TelemetryDispatcher(apiClient, telemetryManager)
         hardwareManager = HardwareManager(telemetryDispatcher)
         

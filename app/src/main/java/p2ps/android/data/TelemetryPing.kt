@@ -14,6 +14,6 @@ data class TelemetryPing(
     val lat: Double,
     val lng: Double,
     @SerializedName("accuracyMeters")
-    val accuracy: Float,
+    val accuracyMeters: Float,
     val timestamp: Long
 )

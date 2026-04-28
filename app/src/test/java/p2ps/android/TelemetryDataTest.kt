@@ -16,7 +16,7 @@ class TelemetryDataTest {
             triggerType = "BACKGROUND",
             lat = 44.4268,
             lng = 26.1025,
-            accuracy = 10.0f,
+            accuracyMeters = 10.0f,
             timestamp = currentTime
         )
 
@@ -24,7 +24,7 @@ class TelemetryDataTest {
         assertEquals(44.4268, ping.lat, 0.0001)
         assertEquals("BACKGROUND", ping.triggerType)
         assertEquals(currentTime, ping.timestamp)
-        assertEquals(10.0f, ping.accuracy)
+        assertEquals(10.0f, ping.accuracyMeters)
     }
 
     @Test
@@ -45,7 +45,7 @@ class TelemetryDataTest {
             triggerType = "MANUAL",
             lat = 48.8566,
             lng = 2.3522,
-            accuracy = 5.0f,
+            accuracyMeters = 5.0f,
             timestamp = 1700000000000L
         )
 
@@ -55,7 +55,7 @@ class TelemetryDataTest {
         assertEquals("MANUAL", ping.triggerType)
         assertEquals(48.8566, ping.lat, 0.0001)
         assertEquals(2.3522, ping.lng, 0.0001)
-        assertEquals(5.0f, ping.accuracy)
+        assertEquals(5.0f, ping.accuracyMeters)
         assertEquals(1700000000000L, ping.timestamp)
     }
 
@@ -73,7 +73,7 @@ class TelemetryDataTest {
         val ping = TelemetryPing("d", "s", "i", "t", 0.0, 0.0, 0.0f, 0L)
         assertEquals(0.0, ping.lat, 0.0)
         assertEquals(0.0, ping.lng, 0.0)
-        assertEquals(0.0f, ping.accuracy)
+        assertEquals(0.0f, ping.accuracyMeters)
         assertEquals(0L, ping.timestamp)
     }
 

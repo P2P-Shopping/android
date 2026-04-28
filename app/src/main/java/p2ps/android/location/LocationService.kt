@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import p2ps.android.R
 import java.util.concurrent.TimeUnit
 import p2ps.android.MainActivity
+import p2ps.android.HardwareManager
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.ApiClient
@@ -38,7 +39,7 @@ class LocationService : Service() {
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val hardwareManager = p2ps.android.HardwareManager()
+    private lateinit var hardwareManager: HardwareManager
 
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
@@ -49,6 +50,7 @@ class LocationService : Service() {
 
         telemetryManager = TelemetryManager(this)
         telemetryDispatcher = TelemetryDispatcher(ApiClient(this), telemetryManager)
+        hardwareManager = HardwareManager(telemetryDispatcher, serviceScope)
         hardwareManager.initialize()
         
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -93,7 +95,7 @@ class LocationService : Service() {
             triggerType = "BACKGROUND",
             lat = location.latitude,
             lng = location.longitude,
-            accuracy = location.accuracy,
+            accuracyMeters = location.accuracy,
             timestamp = System.currentTimeMillis()
         )
 

@@ -1,16 +1,14 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.sonarqube)
+    id("jacoco")
 }
 
 android {
     namespace = "p2ps.android"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
-
+    compileSdk = 36
+    
     defaultConfig {
         applicationId = "p2ps.android"
         minSdk = 31
@@ -22,6 +20,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -37,6 +39,45 @@ android {
     buildFeatures {
         compose = true
     }
+
+    sonar {
+        properties {
+            property("sonar.projectName", "P2P Shopping Android")
+            property("sonar.projectKey", "p2ps-android")
+            property("sonar.host.url", "http://localhost:9000")
+            property("sonar.sources", "src/main/java")
+            property("sonar.tests", "src/test/java")
+            property("sonar.java.binaries", "build/tmp/kotlin-classes/debug")
+            property("sonar.junit.reportPaths", "build/test-results/testDebugUnitTest")
+            property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/testDebugUnitTestCoverage/testDebugUnitTestCoverage.xml")
+        }
+    }
+}
+
+tasks.register<JacocoReport>("testDebugUnitTestCoverage") {
+    dependsOn("testDebugUnitTest")
+    group = "Reporting"
+    description = "Generate Jacoco coverage reports for the debug build."
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+
+    val fileFilter = listOf(
+        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*",
+        "**/*Test*.*", "android/**/*.*"
+    )
+    val debugTree = fileTree("${project.buildDir}/tmp/kotlin-classes/debug") {
+        exclude(fileFilter)
+    }
+    val mainSrc = "${project.projectDir}/src/main/java"
+
+    sourceDirectories.setFrom(files(mainSrc))
+    classDirectories.setFrom(files(debugTree))
+    executionData.setFrom(fileTree("${project.buildDir}") {
+        include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
+    })
 }
 
 dependencies {

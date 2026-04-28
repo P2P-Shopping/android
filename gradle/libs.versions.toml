@@ -10,9 +10,12 @@ playServicesLocation = "21.3.0"
 retrofit = "2.9.0"
 okhttp = "4.12.0"
 kotlin = "2.2.10"
+sonarqube = "4.4.1.3373"
+jacoco = "0.8.12"
 composeBom = "2024.09.00"
 
 [libraries]
+jacoco-core = { group = "org.jacoco", name = "org.jacoco.core", version.ref = "jacoco" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -35,4 +38,6 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
+jacoco = { id = "org.jacoco.android", version = "2.1.0" }
 

@@ -25,6 +25,7 @@ class TelemetryDataTest {
         assertEquals(44.4268, ping.lat, 0.0001)
         assertEquals("BACKGROUND", ping.triggerType)
         assertEquals(currentTime, ping.timestamp)
+        assertEquals(10.0f, ping.accuracyMeters)
     }
 
     @Test

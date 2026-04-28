@@ -216,7 +216,7 @@ fun WelcomeScreen(onTriggerClick: () -> Unit, modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onTriggerClick) {
-            Text("Simulate Hardware Trigger")
+            Text("Hardware Trigger")
         }
     }
 }

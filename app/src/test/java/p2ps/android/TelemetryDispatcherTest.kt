@@ -55,4 +55,60 @@ class TelemetryDispatcherTest {
         dispatcher.dispatch(testPing)
         verify(exactly = 0) { telemetryManager.savePing(any()) }
     }
+
+    @Test
+    fun `test dispatch fallback when API throws exception`() {
+        every { apiClient.sendPing(any()) } throws RuntimeException("Network unavailable")
+        dispatcher.dispatch(testPing)
+        verify(exactly = 1) { telemetryManager.savePing(testPing) }
+    }
+
+    @Test
+    fun `test dispatch fallback when API throws IOException`() {
+        every { apiClient.sendPing(any()) } throws java.io.IOException("Connection refused")
+        dispatcher.dispatch(testPing)
+        verify(exactly = 1) { telemetryManager.savePing(testPing) }
+    }
+
+    @Test
+    fun `test dispatch does not save when API succeeds for different pings`() {
+        val pingA = testPing.copy(itemId = "item_A")
+        val pingB = testPing.copy(itemId = "item_B")
+
+        every { apiClient.sendPing(any()) } returns true
+
+        dispatcher.dispatch(pingA)
+        dispatcher.dispatch(pingB)
+
+        verify(exactly = 0) { telemetryManager.savePing(any()) }
+    }
+
+    @Test
+    fun `test dispatch calls savePing once per failed dispatch`() {
+        every { apiClient.sendPing(any()) } returns false
+
+        dispatcher.dispatch(testPing)
+        dispatcher.dispatch(testPing)
+
+        verify(exactly = 2) { telemetryManager.savePing(testPing) }
+    }
+
+    @Test
+    fun `test dispatch forwards exact ping object to telemetryManager on failure`() {
+        val specificPing = TelemetryPing(
+            deviceId = "device_xyz",
+            storeId = "store_abc",
+            itemId = "item_999",
+            triggerType = "MANUAL",
+            lat = 45.0,
+            lng = 25.0,
+            accuracy = 5.5f,
+            timestamp = 999999999L
+        )
+        every { apiClient.sendPing(any()) } returns false
+
+        dispatcher.dispatch(specificPing)
+
+        verify(exactly = 1) { telemetryManager.savePing(specificPing) }
+    }
 }

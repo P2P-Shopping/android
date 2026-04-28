@@ -189,18 +189,18 @@ class LocationService : Service() {
 
             val movingNow = calculateIsMoving(x, y, z)
             val currentTime = System.currentTimeMillis()
-            val MOVE_DEBOUNCE_MS = 2000L
+            val moveDebounceMs = 2000L
 
             if (movingNow) {
                 if (lastMoveTime == 0L) lastMoveTime = currentTime
-                if (!isMoving && currentTime - lastMoveTime > MOVE_DEBOUNCE_MS) {
+                if (!isMoving && currentTime - lastMoveTime > moveDebounceMs) {
                     isMoving = true
                     Log.d("TelemetryService", "Motion detected – switching to 5s")
                     updateLocationInterval()
                 }
                 if (isMoving) lastMoveTime = currentTime
             } else {
-                if (isMoving && (currentTime - lastMoveTime > MOVE_DEBOUNCE_MS)) {
+                if (isMoving && (currentTime - lastMoveTime > moveDebounceMs)) {
                     isMoving = false
                     Log.d("TelemetryService", "Stationary – switching to 30s")
                     updateLocationInterval()
@@ -210,7 +210,9 @@ class LocationService : Service() {
             }
         }
 
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+            // Not needed for this implementation
+        }
     }
 
     private fun updateLocationInterval() {

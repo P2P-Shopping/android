@@ -16,7 +16,7 @@ class LocationServiceMotionLogicTest {
     // Constants mirrored from LocationService
     private val INTERVAL_MOVING = 5000L
     private val INTERVAL_STATIONARY = 30000L
-    private val MOVE_DEBOUNCE_MS = 2000L
+    private val moveDebounceMs = 2000L
     private val MOTION_THRESHOLD = 0.5
 
     /** Replicates the exact formula from LocationService.sensorListener */
@@ -139,24 +139,24 @@ class LocationServiceMotionLogicTest {
 
     @Test
     fun debounce_afterDebounceWindow_transitionAllowed() {
-        val lastMoveTime = System.currentTimeMillis() - (MOVE_DEBOUNCE_MS + 100)
+        val lastMoveTime = System.currentTimeMillis() - (moveDebounceMs + 100)
         val currentTime = System.currentTimeMillis()
-        Assert.assertTrue(currentTime - lastMoveTime > MOVE_DEBOUNCE_MS)
+        Assert.assertTrue(currentTime - lastMoveTime > moveDebounceMs)
     }
 
     @Test
     fun debounce_withinDebounceWindow_transitionBlocked() {
-        val lastMoveTime = System.currentTimeMillis() - (MOVE_DEBOUNCE_MS - 500)
+        val lastMoveTime = System.currentTimeMillis() - (moveDebounceMs - 500)
         val currentTime = System.currentTimeMillis()
-        Assert.assertFalse(currentTime - lastMoveTime > MOVE_DEBOUNCE_MS)
+        Assert.assertFalse(currentTime - lastMoveTime > moveDebounceMs)
     }
 
     @Test
     fun debounce_exactlyAtBoundary_transitionBlocked() {
         // Exactly 2000ms → NOT strictly greater → blocked
-        val lastMoveTime = System.currentTimeMillis() - MOVE_DEBOUNCE_MS
+        val lastMoveTime = System.currentTimeMillis() - moveDebounceMs
         val currentTime = System.currentTimeMillis()
-        Assert.assertFalse(currentTime - lastMoveTime > MOVE_DEBOUNCE_MS)
+        Assert.assertFalse(currentTime - lastMoveTime > moveDebounceMs)
     }
 
     @Test

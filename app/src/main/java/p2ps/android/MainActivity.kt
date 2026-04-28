@@ -24,6 +24,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
+import p2ps.android.R
 import p2ps.android.ui.theme.P2PSAndroidTheme
 
 class MainActivity : ComponentActivity() {

@@ -1,5 +1,6 @@
 package p2ps.android
 
+import p2ps.android.data.TelemetryBatch
 import p2ps.android.data.TelemetryPing
 import retrofit2.Call
 import retrofit2.http.Body
@@ -13,4 +14,7 @@ interface ApiService {
         @Header("X-Device-Id") deviceId: String,
         @Body ping: TelemetryPing
     ): Call<Unit>
+
+    @POST("v1/telemetry/batch")
+    fun sendBatchPings(@Body batch: TelemetryBatch): Call<Unit>
 }

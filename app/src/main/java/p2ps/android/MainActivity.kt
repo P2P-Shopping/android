@@ -26,6 +26,7 @@ import com.google.android.gms.location.Priority
 import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
+import p2ps.android.R
 import p2ps.android.ui.theme.P2PSAndroidTheme
 
 class MainActivity : ComponentActivity() {
@@ -174,7 +175,7 @@ class MainActivity : ComponentActivity() {
                         triggerType = triggerType,
                         lat = location.latitude,
                         lng = location.longitude,
-                        accuracy = location.accuracy,
+                        accuracyMeters = location.accuracy,
                         timestamp = System.currentTimeMillis()
                     )
                     
@@ -239,7 +240,7 @@ fun WelcomeScreen(onTriggerClick: () -> Unit, modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onTriggerClick) {
-            Text("Simulate Hardware Trigger")
+            Text("Hardware Trigger")
         }
     }
 }

@@ -38,6 +38,7 @@ class LocationService : Service() {
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val hardwareManager = p2ps.android.HardwareManager()
 
     private var currentDeviceId = "unknown"
     private var currentStoreId = "unknown"
@@ -47,8 +48,9 @@ class LocationService : Service() {
         super.onCreate()
 
         telemetryManager = TelemetryManager(this)
-
-        telemetryDispatcher = TelemetryDispatcher(ApiClient(), telemetryManager)
+        telemetryDispatcher = TelemetryDispatcher(ApiClient(this), telemetryManager)
+        hardwareManager.initialize()
+        
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         locationCallback = object : LocationCallback() {
@@ -61,6 +63,7 @@ class LocationService : Service() {
 
         createNotificationChannel()
     }
+
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
@@ -82,7 +85,7 @@ class LocationService : Service() {
     }
 
     private fun processNewLocation(location: Location) {
-        android.util.Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
+        Log.d("TelemetryService", "New telemetry ping generated at ${location.time}")
         val ping = TelemetryPing(
             deviceId = currentDeviceId,
             storeId = currentStoreId,
@@ -93,8 +96,12 @@ class LocationService : Service() {
             accuracy = location.accuracy,
             timestamp = System.currentTimeMillis()
         )
-        
-        // Folosim CoroutineScope pentru a rula asincron și sigur
+
+        // Logica de pe branch-ul main
+        telemetryManager.savePing(ping)
+        hardwareManager.handleHardwareTrigger(ping)
+
+        // Logica de pe branch-ul feature
         serviceScope.launch {
             telemetryDispatcher.dispatch(ping)
         }
@@ -166,6 +173,4 @@ class LocationService : Service() {
         super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
-
-
 }

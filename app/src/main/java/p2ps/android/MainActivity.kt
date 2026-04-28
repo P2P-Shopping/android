@@ -37,10 +37,20 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val notificationsGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            permissions[Manifest.permission.POST_NOTIFICATIONS] == true
-        } else true
+        val fineGranted =
+            permissions[Manifest.permission.ACCESS_FINE_LOCATION]
+                ?: (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED)
+        val notificationsGranted =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                permissions[Manifest.permission.POST_NOTIFICATIONS]
+                    ?: (ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED)
+            } else true
 
         if (fineGranted) {
             Toast.makeText(this, "Location access granted!", Toast.LENGTH_SHORT).show()

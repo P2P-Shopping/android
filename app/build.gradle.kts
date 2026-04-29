@@ -86,6 +86,9 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+
     // Testare
     testImplementation(libs.junit)
     testImplementation("io.mockk:mockk:1.13.5")

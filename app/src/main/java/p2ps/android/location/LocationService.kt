@@ -30,8 +30,10 @@ import p2ps.android.ApiClient
 import p2ps.android.MainActivity
 import p2ps.android.R
 import p2ps.android.core.TelemetryDispatcher
+import p2ps.android.data.DeviceIdManager
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
+import java.util.UUID
 
 class LocationService : Service() {
 
@@ -55,12 +57,14 @@ class LocationService : Service() {
     private val INTERVAL_MOVING = 5000L
     private val INTERVAL_STATIONARY = 30000L
     private var currentInterval = INTERVAL_MOVING
+    private var lastSentLocation: Location? = null
 
     override fun onCreate() {
         super.onCreate()
 
         telemetryManager = TelemetryManager(this)
-        telemetryDispatcher = TelemetryDispatcher(ApiClient(this), telemetryManager)
+        val database = p2ps.android.data.AppDatabase.getDatabase(this)
+        telemetryDispatcher = TelemetryDispatcher(database.telemetryDao(), this)
         
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
@@ -86,11 +90,15 @@ class LocationService : Service() {
             Priority.PRIORITY_HIGH_ACCURACY,
             currentInterval
         ).apply {
-            setMaxUpdateDelayMillis(currentInterval)
-            setMinUpdateIntervalMillis(currentInterval)
+            setMinUpdateDistanceMeters(2.0f) // Request updates every 2 meters
+            setGranularity(Granularity.GRANULARITY_FINE)
+            setWaitForAccurateLocation(true)
         }.build()
 
         try {
+            val isRttSupported = packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_RTT)
+            Log.d("TelemetryService", "Starting updates. WiFi RTT Supported: $isRttSupported")
+
             fusedLocationClient.requestLocationUpdates(
                 locationRequest,
                 locationCallback,
@@ -102,7 +110,19 @@ class LocationService : Service() {
     }
 
     private fun processNewLocation(location: Location) {
-        Log.d("TelemetryService", "New telemetry ping generated at ${location.time} (isMoving: $isMoving)")
+        // 1. Movement Filter: Only send if moved more than 2 meters
+        val distance = lastSentLocation?.distanceTo(location) ?: Float.MAX_VALUE
+        
+        // Also check if the device reports it's actually moving (or first fix)
+        val isLocallyMoving = distance >= 2.0f
+
+        if (!isLocallyMoving && lastSentLocation != null) {
+            Log.d("TelemetryService", "Skipping ping: stationary (< 2m). Dist: ${String.format("%.2f", distance)}m")
+            return
+        }
+
+        Log.d("TelemetryService", "New telemetry ping generated: Dist: ${String.format("%.2f", distance)}m, Accuracy: ${location.accuracy}m")
+        
         val ping = TelemetryPing(
             deviceId = currentDeviceId,
             storeId = currentStoreId,
@@ -111,8 +131,11 @@ class LocationService : Service() {
             lat = location.latitude,
             lng = location.longitude,
             accuracyMeters = location.accuracy,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            pingId = UUID.randomUUID().toString()
         )
+
+        lastSentLocation = location
 
         serviceScope.launch {
             telemetryDispatcher.dispatch(ping)
@@ -143,7 +166,7 @@ class LocationService : Service() {
             return START_NOT_STICKY
         }
         intent?.let {
-            currentDeviceId = it.getStringExtra("EXTRA_DEVICE_ID") ?: "unknown"
+            currentDeviceId = it.getStringExtra("EXTRA_DEVICE_ID") ?: DeviceIdManager.getDeviceId(this)
             currentStoreId = it.getStringExtra("EXTRA_STORE_ID") ?: "unknown"
             currentItemId = it.getStringExtra("EXTRA_ITEM_ID") ?: "unknown"
         }

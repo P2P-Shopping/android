@@ -7,11 +7,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+import p2ps.android.core.scheduleTelemetrySync
+
 /**
  * Persists telemetry data locally using Room Database.
  * Ensures data is not lost when the device is offline.
  */
-class TelemetryManager(context: Context) {
+class TelemetryManager(private val context: Context) {
 
     private val db = AppDatabase.getDatabase(context)
     private val telemetryDao = db.telemetryDao()
@@ -29,13 +31,17 @@ class TelemetryManager(context: Context) {
             latitude = ping.lat,
             longitude = ping.lng,
             accuracy = ping.accuracyMeters,
-            timestamp = ping.timestamp
+            timestamp = ping.timestamp,
+            pingId = ping.pingId
         )
 
         scope.launch {
             try {
                 telemetryDao.insertPing(entity)
                 Log.d("TelemetryManager", "Ping cached offline: ${ping.timestamp}")
+                
+                // Trigger sync automatically
+                scheduleTelemetrySync(context)
             } catch (e: Exception) {
                 Log.e("TelemetryManager", "Failed to insert ping into Room", e)
             }

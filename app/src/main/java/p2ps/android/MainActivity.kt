@@ -26,9 +26,11 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.launch
 import p2ps.android.core.TelemetryDispatcher
+import p2ps.android.data.DeviceIdManager
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.ui.theme.P2PSAndroidTheme
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
 
@@ -38,7 +40,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var hardwareManager: HardwareManager
 
     companion object {
-        private const val DEFAULT_DEVICE_ID = "usr_DEMO"
         private const val DEFAULT_STORE_ID = "Lidl_01"
         private const val DEFAULT_ITEM_ID = "Background_Track"
     }
@@ -70,8 +71,8 @@ class MainActivity : ComponentActivity() {
 
         // Initialize components
         telemetryManager = TelemetryManager(this)
-        val apiClient = ApiClient(this)
-        telemetryDispatcher = TelemetryDispatcher(apiClient, telemetryManager)
+        val database = p2ps.android.data.AppDatabase.getDatabase(this)
+        telemetryDispatcher = TelemetryDispatcher(database.telemetryDao(), this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         hardwareManager = HardwareManager(telemetryDispatcher)
         
@@ -127,7 +128,8 @@ class MainActivity : ComponentActivity() {
     }
 
     @SuppressLint("MissingPermission")
-    fun onHardwareTriggerReceived(storeId: String, itemId: String, deviceId: String = "usr_DEMO", triggerType: String = "HARDWARE") {
+    fun onHardwareTriggerReceived(storeId: String, itemId: String, triggerType: String = "HARDWARE") {
+        val deviceId = DeviceIdManager.getDeviceId(this)
         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
             .addOnSuccessListener { location ->
                 if (location != null) {
@@ -139,7 +141,8 @@ class MainActivity : ComponentActivity() {
                         lat = location.latitude,
                         lng = location.longitude,
                         accuracyMeters = location.accuracy,
-                        timestamp = System.currentTimeMillis()
+                        timestamp = System.currentTimeMillis(),
+                        pingId = UUID.randomUUID().toString()
                     )
 
                     lifecycleScope.launch {
@@ -158,7 +161,7 @@ class MainActivity : ComponentActivity() {
 
     private fun startLocationTrackingService() {
         val intent = android.content.Intent(this, p2ps.android.location.LocationService::class.java).apply {
-            putExtra("EXTRA_DEVICE_ID", DEFAULT_DEVICE_ID)
+            putExtra("EXTRA_DEVICE_ID", DeviceIdManager.getDeviceId(this@MainActivity))
             putExtra("EXTRA_STORE_ID", DEFAULT_STORE_ID)
             putExtra("EXTRA_ITEM_ID", DEFAULT_ITEM_ID)
         }

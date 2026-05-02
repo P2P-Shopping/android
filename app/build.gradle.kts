@@ -94,6 +94,9 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.5")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.webkit:webkit:1.11.0")
 }
 
 tasks.withType<Test> {

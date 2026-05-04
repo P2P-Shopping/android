@@ -12,6 +12,7 @@ import androidx.activity.OnBackPressedCallback
 import android.content.Intent
 import android.net.Uri
 import android.webkit.WebResourceRequest
+import android.util.Log
 
 class WebViewActivity : ComponentActivity() {
 
@@ -32,7 +33,9 @@ class WebViewActivity : ComponentActivity() {
         ))
 
         rootLayout.addView(progressBar, FrameLayout.LayoutParams(
-            150, 150, android.view.Gravity.CENTER
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.view.Gravity.CENTER
         ))
 
         setContentView(rootLayout)
@@ -42,6 +45,7 @@ class WebViewActivity : ComponentActivity() {
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
         }
+        val internalDomain = android.net.Uri.parse(BuildConfig.DASHBOARD_URL).host ?: "10.0.2.2"
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -53,22 +57,27 @@ class WebViewActivity : ComponentActivity() {
                         val intent = Intent(Intent.ACTION_VIEW, uri)
                         startActivity(intent)
                     } catch (e: Exception) {
+                        Log.w("WebViewActivity", "No app to handle intent: ${e.message}")
                     }
                     return true
                 }
-
-                val internalDomain = "10.0.2.2"
 
                 return if (!url.contains(internalDomain)) {
                     try {
                         val intent = Intent(Intent.ACTION_VIEW, uri)
                         startActivity(intent)
                     } catch (e: Exception) {
+                        Log.w("WebViewActivity", "No app to handle external link: ${e.message}")
                     }
                     true
                 } else {
                     false
                 }
+            }
+
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                progressBar.visibility = View.VISIBLE
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)

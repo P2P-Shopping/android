@@ -79,10 +79,6 @@ class MainActivity : ComponentActivity() {
         
         hardwareManager.initialize()
 
-        if (savedInstanceState == null) {
-            checkLocationPermission()
-        }
-
         enableEdgeToEdge()
         setContent {
             P2PSAndroidTheme {
@@ -95,6 +91,10 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+
+        if (savedInstanceState == null) {
+            checkLocationPermission()
         }
     }
 

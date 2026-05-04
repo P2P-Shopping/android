@@ -31,9 +31,9 @@ import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.ui.theme.P2PSAndroidTheme
 import java.util.UUID
+import android.content.Intent
 
 class MainActivity : ComponentActivity() {
-
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
         if (fineGranted) {
             Toast.makeText(this, "Location access granted!", Toast.LENGTH_SHORT).show()
             startLocationTrackingService()
+            launchWebView()
             if (!notificationsGranted) {
                 Toast.makeText(this, "Notifications disabled. Service will run silently.", Toast.LENGTH_LONG).show()
             }
@@ -122,6 +123,7 @@ class MainActivity : ComponentActivity() {
         
         if (missing.isEmpty()) {
             startLocationTrackingService()
+            launchWebView()
         } else {
             requestPermissionLauncher.launch(missing.toTypedArray())
         }
@@ -166,6 +168,11 @@ class MainActivity : ComponentActivity() {
             putExtra("EXTRA_ITEM_ID", DEFAULT_ITEM_ID)
         }
         startForegroundService(intent)
+    }
+    private fun launchWebView() {
+        val intent = android.content.Intent(this, WebViewActivity::class.java)
+        startActivity(intent)
+        finish()
     }
 }
 

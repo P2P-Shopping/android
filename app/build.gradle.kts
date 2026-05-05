@@ -30,6 +30,9 @@ android {
         }
         val apiKey = properties.getProperty("API_KEY") ?: ""
         buildConfigField("String", "API_KEY", "\"$apiKey\"")
+
+        val dashboardUrl = properties.getProperty("DASHBOARD_URL") ?: "https://p2p-shopping.app"
+        buildConfigField("String", "DASHBOARD_URL", "\"$dashboardUrl\"")
     }
 
     buildTypes {

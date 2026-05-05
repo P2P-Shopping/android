@@ -1,6 +1,7 @@
 package p2ps.android.core
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
@@ -35,8 +36,20 @@ class TelemetrySyncWorker(
             }
 
             try {
+                // Filtrează entitățile invalide (itemId gol) înainte de a le trimite
+                val invalidEntities = entities.filter { it.itemId.isBlank() }
+                if (invalidEntities.isNotEmpty()) {
+                    Log.w("TelemetrySyncWorker", "Deleting ${invalidEntities.size} corrupt records (blank itemId)")
+                    telemetryDao.deleteByIds(invalidEntities.map { it.id })
+                }
+
+                val validEntities = entities.filter { it.itemId.isNotBlank() }
+                if (validEntities.isEmpty()) {
+                    continue
+                }
+
                 // Transform the database entities into the required API format.
-                val pings = entities.map { it.toPing() }
+                val pings = validEntities.map { it.toPing() }
 
                 // Suspend execution until the network request finishes.
                 // Reutilizăm logica din ApiClient pentru trimiterea batch-ului.

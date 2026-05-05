@@ -15,17 +15,20 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.launch
 import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.AppDatabase
 import p2ps.android.data.DeviceIdManager
 import p2ps.android.data.TelemetryPing
 import java.util.UUID
+import org.json.JSONObject
 
 class WebViewActivity : ComponentActivity() {
 
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var webView: WebView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,10 +37,9 @@ class WebViewActivity : ComponentActivity() {
         telemetryDispatcher = TelemetryDispatcher(database.telemetryDao(), this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
-        // Permite inspectarea WebView din Chrome (chrome://inspect)
-        WebView.setWebContentsDebuggingEnabled(true)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
-        val webView = WebView(this)
+        webView = WebView(this)
         val progressBar = ProgressBar(this).apply {
             visibility = View.VISIBLE
         }
@@ -52,37 +54,39 @@ class WebViewActivity : ComponentActivity() {
             domStorageEnabled = true
             databaseEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
-            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            mixedContentMode = if (BuildConfig.DEBUG) {
+                WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            } else {
+                WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            }
         }
 
+        // Folosim interfața clasică dar cu securitate sporită și stabilitate asincronă
         webView.addJavascriptInterface(WebAppInterface(), "AndroidInterface")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(message: ConsoleMessage?): Boolean {
-                Log.d("WebViewJS", "${message?.message()} -- From line ${message?.lineNumber()} of ${message?.sourceId()}")
+                Log.d("WebViewJS", "${message?.message()}")
                 return true
             }
         }
-        
-        val internalDomain = Uri.parse(BuildConfig.DASHBOARD_URL).host ?: "127.0.0.1"
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 progressBar.visibility = View.GONE
-                Log.i("WebViewActivity", "Page finished loading. Injecting hook...")
                 injectAutoPingScript(view)
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
-                if (!url.contains(internalDomain) && !url.contains("localhost") && !url.contains("127.0.0.1")) {
+                val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host
+                if (authorizedHost != null && !url.contains(authorizedHost) && 
+                    !url.contains("localhost") && !url.contains("127.0.0.1") && !url.contains("10.0.2.2")) {
                     try {
                         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         return true
-                    } catch (e: Exception) {
-                        return false
-                    }
+                    } catch (e: Exception) { return false }
                 }
                 return false
             }
@@ -100,30 +104,32 @@ class WebViewActivity : ComponentActivity() {
         webView.loadUrl(BuildConfig.DASHBOARD_URL)
     }
 
+    override fun onResume() { super.onResume(); webView.onResume() }
+    override fun onPause() { super.onPause(); webView.onPause() }
+    override fun onDestroy() {
+        webView.apply {
+            removeJavascriptInterface("AndroidInterface")
+            stopLoading()
+            loadUrl("about:blank")
+            destroy()
+        }
+        super.onDestroy()
+    }
+
     private fun injectAutoPingScript(view: WebView?) {
         val js = """
             (function() {
-                console.log('P2P: Initializing interaction monitor...');
-                
                 document.addEventListener('change', function(e) {
                     var target = e.target;
                     if (target.type === 'checkbox' && target.checked) {
                         var itemContainer = target.closest('li') || target.closest('[data-id]');
-                        var itemId = null;
-                        
-                        if (itemContainer) {
-                            itemId = itemContainer.getAttribute('data-id') || itemContainer.id;
-                            if (!itemId) {
-                                var nameEl = itemContainer.querySelector('span');
-                                itemId = nameEl ? nameEl.innerText.trim() : null;
-                            }
+                        var itemId = itemContainer ? (itemContainer.getAttribute('data-id') || itemContainer.id) : null;
+                        if (!itemId) {
+                            var nameEl = itemContainer ? itemContainer.querySelector('span') : null;
+                            itemId = nameEl ? nameEl.innerText.trim() : 'ui_item_' + Date.now();
                         }
-                        
-                        itemId = itemId || 'ui_item_' + Date.now();
-                        
                         var storeId = 'Lidl_Vite_Physical';
-                        console.log('P2P: Check-off detected for ' + itemId);
-                        if (window.AndroidInterface && typeof window.AndroidInterface.postTelemetry === 'function') {
+                        if (window.AndroidInterface) {
                             window.AndroidInterface.postTelemetry(storeId, itemId, 'WEB_UI_CHECKOFF');
                         }
                     }
@@ -136,69 +142,76 @@ class WebViewActivity : ComponentActivity() {
     inner class WebAppInterface {
         @JavascriptInterface
         fun postTelemetry(storeId: String, itemId: String, triggerType: String) {
-            Log.i("WebViewActivity", "BRIDGE: Received ping from JS for $itemId")
+            // Validarea originii se face acum pe thread-ul principal pentru siguranță
             runOnUiThread {
-                sendPing(storeId, itemId, triggerType)
+                if (isAuthorized()) {
+                    sendPing(storeId, itemId, triggerType)
+                }
             }
         }
 
         @JavascriptInterface
-        fun getDeviceId(): String = DeviceIdManager.getDeviceId(this@WebViewActivity)
+        fun getDeviceId(): String = if (isAuthorized()) DeviceIdManager.getDeviceId(this@WebViewActivity) else ""
 
         @JavascriptInterface
         fun getPlatform(): String = "android"
+
+        private fun isAuthorized(): Boolean {
+            val url = webView.url ?: return false
+            val host = Uri.parse(url).host ?: return false
+            val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host
+            return host == authorizedHost || host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2"
+        }
     }
 
     private fun sendPing(storeId: String, itemId: String, triggerType: String) {
         val deviceId = DeviceIdManager.getDeviceId(this)
-        
-        // Încercăm să obținem locația curentă cu prioritate mare
+        val cts = CancellationTokenSource()
+
+        val timeoutJob = lifecycleScope.launch {
+            kotlinx.coroutines.delay(10000) // 10s timeout
+            if (!cts.token.isCancellationRequested) cts.cancel()
+        }
+
         try {
-            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                .addOnCompleteListener { timeoutJob.cancel() }
                 .addOnSuccessListener { location ->
-                    val finalLocation = location ?: null // Putem adăuga un fallback la lastLocation aici
-                    
-                    if (finalLocation != null) {
-                        dispatchPing(deviceId, storeId, itemId, triggerType, finalLocation.latitude, finalLocation.longitude, finalLocation.accuracy)
+                    if (location != null) {
+                        dispatchPing(deviceId, storeId, itemId, triggerType, location.latitude, location.longitude, location.accuracy)
                     } else {
-                        // Fallback: Încercăm ultima locație cunoscută dacă cea curentă e null
-                        fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc ->
-                            if (lastLoc != null) {
-                                dispatchPing(deviceId, storeId, itemId, triggerType, lastLoc.latitude, lastLoc.longitude, lastLoc.accuracy)
-                            } else {
-                                Log.w("WebViewActivity", "Location unavailable, sending ping with 0,0")
-                                dispatchPing(deviceId, storeId, itemId, triggerType, 0.0, 0.0, 0f)
-                            }
-                        }
+                        tryLastLocationFallback(deviceId, storeId, itemId, triggerType)
                     }
                 }
+                .addOnFailureListener { tryLastLocationFallback(deviceId, storeId, itemId, triggerType) }
+                .addOnCanceledListener { tryLastLocationFallback(deviceId, storeId, itemId, triggerType) }
         } catch (e: SecurityException) {
-            Log.e("WebViewActivity", "Location permission missing during ping", e)
+            timeoutJob.cancel()
+            dispatchPing(deviceId, storeId, itemId, triggerType, 0.0, 0.0, 0f)
+        }
+    }
+
+    private fun tryLastLocationFallback(deviceId: String, storeId: String, itemId: String, triggerType: String) {
+        try {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { lastLoc ->
+                    val lat = lastLoc?.latitude ?: 0.0
+                    val lng = lastLoc?.longitude ?: 0.0
+                    val acc = lastLoc?.accuracy ?: 0f
+                    dispatchPing(deviceId, storeId, itemId, triggerType, lat, lng, acc)
+                }
+                .addOnFailureListener { dispatchPing(deviceId, storeId, itemId, triggerType, 0.0, 0.0, 0f) }
+        } catch (e: SecurityException) {
+            dispatchPing(deviceId, storeId, itemId, triggerType, 0.0, 0.0, 0f)
         }
     }
 
     private fun dispatchPing(deviceId: String, storeId: String, itemId: String, triggerType: String, lat: Double, lng: Double, acc: Float) {
-        if (itemId.isBlank()) {
-            Log.w("WebViewActivity", "ABORT: itemId is blank, skipping telemetry")
-            return
-        }
-
-        val ping = TelemetryPing(
-            deviceId = deviceId,
-            storeId = storeId,
-            itemId = itemId,
-            triggerType = triggerType,
-            lat = lat,
-            lng = lng,
-            accuracyMeters = acc,
-            timestamp = System.currentTimeMillis(),
-            pingId = UUID.randomUUID().toString()
-        )
-
+        if (itemId.isBlank()) return
+        val ping = TelemetryPing(deviceId, storeId, itemId, triggerType, lat, lng, acc, System.currentTimeMillis(), UUID.randomUUID().toString())
         lifecycleScope.launch {
             telemetryDispatcher.dispatch(ping)
-            Log.i("WebViewActivity", "SUCCESS: Ping saved to DB for $itemId")
-            Toast.makeText(this@WebViewActivity, "Ping înregistrat: $itemId", Toast.LENGTH_SHORT).show()
+            Log.i("WebViewActivity", "SUCCESS: Telemetry saved for $itemId")
         }
     }
 }

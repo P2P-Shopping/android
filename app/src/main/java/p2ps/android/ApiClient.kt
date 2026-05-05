@@ -9,6 +9,7 @@ import p2ps.android.data.TelemetryPing
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.UUID
+import p2ps.android.BuildConfig
 
 class ApiClient(context: Context) {
     companion object {
@@ -21,7 +22,6 @@ class ApiClient(context: Context) {
     private val deviceId: String
 
     init {
-        // Generăm sau recuperăm un ID unic pentru acest telefon
         val prefs = context.getSharedPreferences("p2ps_prefs", Context.MODE_PRIVATE)
         deviceId = prefs.getString("DEVICE_ID", null) ?: UUID.randomUUID().toString().also {
             prefs.edit().putString("DEVICE_ID", it).apply()
@@ -53,17 +53,17 @@ class ApiClient(context: Context) {
 
     suspend fun sendPing(ping: TelemetryPing): Boolean {
         return try {
-            Log.d(TAG, "Trimitere telemetrie pentru: ${ping.itemId}")
+            Log.d(TAG, "Send telemetry for: ${ping.itemId}")
             val response = apiService.sendPing(ping)
             if (response.isSuccessful || response.code() == 202) {
-                Log.i(TAG, "Succes: ${response.code()}")
+                Log.i(TAG, "Success: ${response.code()}")
                 true
             } else {
-                Log.e(TAG, "Eroare server: ${response.code()}")
+                Log.e(TAG, "Server error: ${response.code()}")
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Eroare rețea: ${e.message}")
+            Log.e(TAG, "Network error: ${e.message}")
             false
         }
     }

@@ -100,6 +100,10 @@ dependencies {
 
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.webkit:webkit:1.11.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    // Dependențe pentru Unit Testing (directorul 'test')
+    testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation("androidx.test:core-ktx:1.5.0")
 }
 
 tasks.withType<Test> {

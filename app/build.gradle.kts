@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.sonarqube)
     alias(libs.plugins.jacoco)
+    alias(libs.plugins.google.services)
+
 }
 
 android {
@@ -69,6 +71,8 @@ jacoco {
 }
 
 dependencies {
+
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -94,12 +98,17 @@ dependencies {
 
     // Testare
     testImplementation(libs.junit)
-    testImplementation("io.mockk:mockk:1.13.5")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("io.mockk:mockk:1.13.13")
 
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.webkit:webkit:1.11.0")
+
+     // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging.ktx)
 }
 
 tasks.withType<Test> {
@@ -108,3 +117,4 @@ tasks.withType<Test> {
         excludes = listOf("jdk.internal.*")
     }
 }
+

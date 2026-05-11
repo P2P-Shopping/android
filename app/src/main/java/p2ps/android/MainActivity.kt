@@ -5,7 +5,6 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
-import android.webkit.JavascriptInterface
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,7 +30,6 @@ import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
 import p2ps.android.ui.theme.P2PSAndroidTheme
 import java.util.UUID
-import android.content.Intent
 
 class MainActivity : ComponentActivity() {
     private lateinit var telemetryManager: TelemetryManager
@@ -78,6 +76,14 @@ class MainActivity : ComponentActivity() {
         hardwareManager = HardwareManager(telemetryDispatcher)
         
         hardwareManager.initialize()
+
+        // Fetch FCM token at startup so proximity pings can include it
+        lifecycleScope.launch {
+            val token = p2ps.android.fcm.FcmTokenManager.fetchToken()
+            if (token != null) {
+                p2ps.android.fcm.FcmTokenManager.saveToken(this@MainActivity, token)
+            }
+        }
 
         enableEdgeToEdge()
         setContent {

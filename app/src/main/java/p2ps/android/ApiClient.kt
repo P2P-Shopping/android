@@ -15,7 +15,7 @@ class ApiClient(context: Context) {
     companion object {
         private const val TAG = "ApiClient"
         // Folosim 127.0.0.1 pentru ADB Reverse prin USB
-        private const val BASE_URL = "http://127.0.0.1:8081/api/"
+         private const val BASE_URL = "http://127.0.0.1:8081/api/"
     }
 
     private val apiService: ApiService

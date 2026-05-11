@@ -12,8 +12,19 @@ object ProximityNotificationUtils {
     /**
      * Returns true if a notification should be shown for this FCM message.
      */
-    fun shouldShowNotification(type: String?, deepLink: String?): Boolean =
-        type == "PROXIMITY_ALERT" && !deepLink.isNullOrBlank()
+    fun shouldShowNotification(type: String?, deepLink: String?): Boolean {
+        if (type != "PROXIMITY_ALERT" || deepLink.isNullOrBlank()) return false
+        return try {
+            val uri = java.net.URI(deepLink.trim())
+            val allowedSchemes = setOf("http", "https")
+            val allowedHosts = setOf("localhost", "127.0.0.1", "10.0.2.2", "p2p-shopping.app")
+            uri.scheme in allowedSchemes &&
+                    uri.host in allowedHosts &&
+                    uri.path?.startsWith("/list/") == true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     /**
      * Returns the notification title, falling back to default if null.
@@ -36,5 +47,10 @@ object ProximityNotificationUtils {
      * Extracts the list ID from a deep link URL.
      * e.g. "http://localhost:5173/list/abc123" -> "abc123"
      */
-    fun extractListId(deepLink: String): String = deepLink.substringAfterLast("/")
+    fun extractListId(deepLink: String): String =
+        deepLink
+            .substringBefore('#')
+            .substringBefore('?')
+            .trimEnd('/')
+            .substringAfterLast("/")
 }

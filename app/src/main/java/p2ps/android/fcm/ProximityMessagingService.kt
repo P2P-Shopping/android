@@ -36,7 +36,7 @@ class ProximityMessagingService : FirebaseMessagingService() {
         val type = message.data["type"]
         val deepLink = message.data["deepLink"]
 
-        Log.d(TAG, "FCM message received. type=$type, deepLink=$deepLink")
+        Log.d(TAG, "FCM message received. type=$type, hasDeepLink=${!deepLink.isNullOrBlank()}")
 
         if (ProximityNotificationUtils.shouldShowNotification(type, deepLink)) {
             val title = ProximityNotificationUtils.resolveTitle(message.notification?.title)

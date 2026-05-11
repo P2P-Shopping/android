@@ -42,6 +42,8 @@ class ProximityClient(
                 Log.e(TAG, "Proximity ping failed: ${response.code()}")
             }
             success
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Proximity ping network error: ${e.message}")
             false

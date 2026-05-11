@@ -33,14 +33,19 @@ object FcmTokenManager {
      * Returns null if Firebase fails.
      */
     suspend fun fetchToken(): String? = suspendCancellableCoroutine { cont ->
-        FirebaseMessaging.getInstance().token
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    cont.resume(task.result)
+        val task = FirebaseMessaging.getInstance().token
+        task.addOnCompleteListener { t ->
+            if (cont.isActive) {
+                if (t.isSuccessful) {
+                    cont.resume(t.result)
                 } else {
-                    Log.e(TAG, "Failed to fetch FCM token", task.exception)
+                    Log.e(TAG, "Failed to fetch FCM token", t.exception)
                     cont.resume(null)
                 }
             }
+        }
+        cont.invokeOnCancellation {
+            Log.d(TAG, "Token fetch was cancelled")
+        }
     }
 }

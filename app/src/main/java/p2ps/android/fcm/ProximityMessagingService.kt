@@ -17,6 +17,7 @@ import p2ps.android.WebViewActivity
 class ProximityMessagingService : FirebaseMessagingService() {
 
     companion object {
+        private val notificationIdCounter = java.util.concurrent.atomic.AtomicInteger(0)
         private const val TAG = "ProximityMessaging"
         private const val CHANNEL_ID = "proximity_alerts"
         private const val CHANNEL_NAME = "Proximity Alerts"
@@ -34,19 +35,19 @@ class ProximityMessagingService : FirebaseMessagingService() {
 
         val type = message.data["type"]
         val deepLink = message.data["deepLink"]
-        val title = message.notification?.title ?: "Item nearby!"
-        val body = message.notification?.body
-            ?: "A shopping list item is available near your current location."
 
         Log.d(TAG, "FCM message received. type=$type, deepLink=$deepLink")
 
-        if (type == "PROXIMITY_ALERT" && !deepLink.isNullOrBlank()) {
-            showProximityNotification(title, body, deepLink)
+        if (ProximityNotificationUtils.shouldShowNotification(type, deepLink)) {
+            val title = ProximityNotificationUtils.resolveTitle(message.notification?.title)
+            val body = ProximityNotificationUtils.resolveBody(message.notification?.body)
+            showProximityNotification(title, body, deepLink!!)
         }
     }
 
     private fun showProximityNotification(title: String, body: String, deepLink: String) {
         createChannelIfNeeded()
+        val notificationId = notificationIdCounter.incrementAndGet()
 
         val intent = Intent(this, WebViewActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -55,7 +56,7 @@ class ProximityMessagingService : FirebaseMessagingService() {
 
         val pendingIntent = PendingIntent.getActivity(
             this,
-            deepLink.hashCode(),
+            notificationId,
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -70,7 +71,7 @@ class ProximityMessagingService : FirebaseMessagingService() {
             .build()
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(deepLink.hashCode(), notification)
+        manager.notify(notificationId, notification)
     }
 
     private fun createChannelIfNeeded() {

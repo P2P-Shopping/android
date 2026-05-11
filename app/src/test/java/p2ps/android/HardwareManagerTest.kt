@@ -96,6 +96,6 @@ class HardwareManagerTest {
     @Test
     fun handleHardwareTrigger_deprecatedOverload_doesNotCrash() {
         try { manager().handleHardwareTrigger("s", "i") }
-        catch (e: Exception) { fail("Should not throw") }
+        catch (e: Exception) { fail("Should not throw: ${e.message}") }
     }
 }

@@ -97,14 +97,11 @@ class TelemetryManagerTest {
         telemetryManager.clearCache()
         coVerify(exactly = 2) { mockDao.clearCache() }
     }
-
     @Test
     fun savePing_triggersDaoInsertion() = runBlocking {
         val ping = TelemetryPing("dev", "store", "item", "BACKGROUND",
             44.0, 26.0, 5f, 1000L, "ping-001")
         telemetryManager.savePing(ping)
-        // savePing uses fire-and-forget scope, give it time
-        Thread.sleep(200)
-        coVerify(atLeast = 1) { mockDao.insertPing(any()) }
+        coVerify(timeout = 1_000, exactly = 1) { mockDao.insertPing(any()) }
     }
 }

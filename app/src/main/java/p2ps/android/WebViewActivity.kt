@@ -101,7 +101,6 @@ class WebViewActivity : ComponentActivity() {
             }
         })
 
-        webView.loadUrl(BuildConfig.DASHBOARD_URL)
 
         // Check if launched from a proximity notification with a deep link
         val deepLink = intent?.getStringExtra("deepLink")

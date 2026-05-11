@@ -108,7 +108,7 @@ dependencies {
 
      // Firebase
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.messaging.ktx)
+    implementation(libs.firebase.messaging)
 }
 
 tasks.withType<Test> {

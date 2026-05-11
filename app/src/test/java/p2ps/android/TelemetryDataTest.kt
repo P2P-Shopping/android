@@ -68,6 +68,7 @@ class TelemetryDataTest {
         assertEquals(p.lng, entity.longitude, 0.0001)
         assertEquals(p.accuracyMeters, entity.accuracy, 0.0001f)
         assertEquals(p.timestamp, entity.timestamp)
+        assertEquals(p.pingId, entity.pingId)
     }
 
     @Test

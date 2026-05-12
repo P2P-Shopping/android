@@ -47,6 +47,7 @@ class WebViewActivity : ComponentActivity() {
     companion object {
         private const val KEY_PHOTO_URI = "saved_photo_uri"
         private const val KEY_CALLBACK_ID = "saved_callback_id"
+        private const val JS_CALLBACK_NULL = "javascript:window.onNativeImageReceived(null)"
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -104,7 +105,7 @@ class WebViewActivity : ComponentActivity() {
                 handleCaptureResult(dataUri, result.data)
             } else {
                 handleCaptureResult(null, result.data)
-                webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)            }
+                webView.evaluateJavascript(JS_CALLBACK_NULL, null)            }
         }
 
         permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -112,7 +113,7 @@ class WebViewActivity : ComponentActivity() {
             if (cameraGranted) {
                 jsBridge.openNativeCamera(currentCallbackId)
             } else {
-                webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)
+                webView.evaluateJavascript(JS_CALLBACK_NULL, null)
                 Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show()
             }
         }
@@ -132,7 +133,7 @@ class WebViewActivity : ComponentActivity() {
                 }
             } else {
                 webView.post {
-                    webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)
+                    webView.evaluateJavascript(JS_CALLBACK_NULL, null)
                 }
             }
         }
@@ -323,7 +324,7 @@ class WebViewActivity : ComponentActivity() {
                 Log.e("P2P_Telemetry", "Error processing URI: ${e.message}")
 
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)
+                    webView.evaluateJavascript(JS_CALLBACK_NULL, null)
                 }
             }
         }

@@ -48,8 +48,8 @@ class WebViewActivity : ComponentActivity() {
         private const val KEY_PHOTO_URI = "saved_photo_uri"
         private const val KEY_CALLBACK_ID = "saved_callback_id"
         private const val JS_CALLBACK_NULL = "javascript:window.onNativeImageReceived(null)"
-        private const val IP_LOCALHOST = "127.0.0.1"
-        private const val IP_EMULATOR_HOST = "10.0.2.2"
+        private const val IP_LOCALHOST = "127.0.0.1" // NOSONAR
+        private const val IP_EMULATOR_HOST = "10.0.2.2" // NOSONAR
         private const val HOST_LOCALHOST = "localhost"
     }
 

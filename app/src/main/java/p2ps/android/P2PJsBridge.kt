@@ -11,6 +11,8 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.content.Intent
 import android.provider.MediaStore
+import android.util.Log
+import p2ps.android.WebViewActivity
 
 class P2PJsBridge(private val context: Context) {
 
@@ -20,6 +22,7 @@ class P2PJsBridge(private val context: Context) {
         const val CAMERA_REQ_CODE = 101
         var lastCallbackId: String? = null
         const val PICK_IMAGE_REQ_CODE = 201
+        var photoUri: android.net.Uri? = null
     }
 
     @JavascriptInterface
@@ -51,38 +54,61 @@ class P2PJsBridge(private val context: Context) {
     @JavascriptInterface
     fun getPlatform(): String = "android"
 
+
     @JavascriptInterface
-    fun openNativeCamera(callbackId: String) {
-        lastCallbackId = callbackId
-        val activity = context as? Activity ?: return
+    fun openNativeCamera(callbackId: Any?) {
+        val webActivity = context as? WebViewActivity ?: return
+        lastCallbackId = callbackId.toString()
+        webActivity.runOnUiThread {
 
-        activity.runOnUiThread {
-            val permissions = arrayOf(
-                Manifest.permission.CAMERA,
-                Manifest.permission.READ_MEDIA_IMAGES
-            )
+            val hasCameraPermission = ContextCompat.checkSelfPermission(
+                webActivity,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
 
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                (context as? WebViewActivity)?.requestCameraPermissions(permissions)            } else {
+            if (hasCameraPermission) {
+                Log.d("P2PBridge", "Permission already exists. Starting camera...")
                 dispatchCameraIntent()
+            } else {
+                Log.d("P2PBridge", "No permission. Please give permission...")
+                webActivity.requestCameraPermissions(arrayOf(Manifest.permission.CAMERA))
             }
         }
     }
 
+
     private fun dispatchCameraIntent() {
         val activity = context as? WebViewActivity ?: return
-
         activity.runOnUiThread {
-            val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            val galleryIntent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-
-            val chooser = Intent.createChooser(galleryIntent, "Select Image Source")
-            chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(cameraIntent))
-
             try {
+                val storageDir = activity.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES) ?: return@runOnUiThread
+
+                val photoFile = java.io.File.createTempFile(
+                    "JPEG_${System.currentTimeMillis()}_",
+                    ".jpg",
+                    storageDir
+                )
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    activity,
+                    "p2ps.android.fileprovider",
+                    photoFile
+                )
+                photoUri = uri
+
+                val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                    putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                    addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                }
+
+                val galleryIntent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+
+                val chooser = Intent.createChooser(galleryIntent, "Select image source")
+                chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(cameraIntent))
+
                 activity.launchNativePicker(chooser)
+
             } catch (e: Exception) {
-                android.util.Log.e("P2PJsBridge", "Failed to launch: ${e.message}")
+                e.printStackTrace()
             }
         }
     }

@@ -23,15 +23,68 @@ import p2ps.android.data.DeviceIdManager
 import p2ps.android.data.TelemetryPing
 import java.util.UUID
 import org.json.JSONObject
-
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
+import android.content.pm.PackageManager
+import android.Manifest
+import android.util.Base64
+import java.io.InputStream
 class WebViewActivity : ComponentActivity() {
 
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var webView: WebView
+    private lateinit var jsBridge: P2PJsBridge
+    private lateinit var cameraGalleryLauncher: ActivityResultLauncher<Intent>
+
+    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        webView = WebView(this)
+
+        jsBridge = P2PJsBridge(this)
+        webView.addJavascriptInterface(jsBridge, "P2PBridge")
+        webView.addJavascriptInterface(WebAppInterface(), "AndroidInterface")
+
+        cameraGalleryLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val callbackId = P2PJsBridge.lastCallbackId
+            if (result.resultCode == RESULT_OK) {
+                val dataUri: Uri? = result.data?.data
+                if (dataUri != null) {
+                    processAndSendImage(dataUri)
+                } else {
+                    val bundle = result.data?.extras
+                    val bitmap = bundle?.get("data") as? android.graphics.Bitmap
+                    bitmap?.let {
+                        val outputStream = java.io.ByteArrayOutputStream()
+                        it.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, outputStream)
+                        val bytes = outputStream.toByteArray()
+                        val base64String = Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+                        webView.post {
+                            webView.evaluateJavascript("javascript:window.onNativeImageReceived('$base64String')", null)
+                        }
+                    }
+                }
+            } else {
+                webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)
+            }
+        }
+
+        permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
+            val callbackId = P2PJsBridge.lastCallbackId ?: return@registerForActivityResult
+
+            if (cameraGranted) {
+                Log.d("WebViewActivity", "Permission granted via API, launching bridge...")
+                jsBridge.openNativeCamera(callbackId)
+            } else {
+                webView.evaluateJavascript("javascript:onNativeUploadError('$callbackId', 'Permission Denied')", null)
+                Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         val database = AppDatabase.getDatabase(this)
         telemetryDispatcher = TelemetryDispatcher(database.telemetryDao(), this)
@@ -39,7 +92,6 @@ class WebViewActivity : ComponentActivity() {
 
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
-        webView = WebView(this)
         val progressBar = ProgressBar(this).apply {
             visibility = View.VISIBLE
         }
@@ -52,7 +104,6 @@ class WebViewActivity : ComponentActivity() {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            databaseEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             mixedContentMode = if (BuildConfig.DEBUG) {
                 WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -61,8 +112,6 @@ class WebViewActivity : ComponentActivity() {
             }
         }
 
-        // Folosim interfața clasică dar cu securitate sporită și stabilitate asincronă
-        webView.addJavascriptInterface(WebAppInterface(), "AndroidInterface")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(message: ConsoleMessage?): Boolean {
@@ -104,10 +153,18 @@ class WebViewActivity : ComponentActivity() {
         webView.loadUrl(BuildConfig.DASHBOARD_URL)
     }
 
+    fun launchNativePicker(intent: Intent) {
+        cameraGalleryLauncher.launch(intent)
+    }
+    fun requestCameraPermissions(permissions: Array<String>) {
+        permissionLauncher.launch(permissions)
+    }
+
     override fun onResume() { super.onResume(); webView.onResume() }
     override fun onPause() { super.onPause(); webView.onPause() }
     override fun onDestroy() {
         webView.apply {
+            removeJavascriptInterface("P2PJsBridge")
             removeJavascriptInterface("AndroidInterface")
             stopLoading()
             loadUrl("about:blank")
@@ -142,7 +199,6 @@ class WebViewActivity : ComponentActivity() {
     inner class WebAppInterface {
         @JavascriptInterface
         fun postTelemetry(storeId: String, itemId: String, triggerType: String) {
-            // Validarea originii se face acum pe thread-ul principal pentru siguranță
             runOnUiThread {
                 if (isAuthorized()) {
                     sendPing(storeId, itemId, triggerType)
@@ -212,6 +268,21 @@ class WebViewActivity : ComponentActivity() {
         lifecycleScope.launch {
             telemetryDispatcher.dispatch(ping)
             Log.i("WebViewActivity", "SUCCESS: Telemetry saved for $itemId")
+        }
+    }
+
+    private fun processAndSendImage(uri: Uri) {
+        try {
+            val inputStream = contentResolver.openInputStream(uri)
+            val bytes = inputStream?.readBytes()
+            val base64String = Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+            webView.post {
+                webView.evaluateJavascript("javascript:window.onNativeImageReceived('$base64String')", null)
+            }
+            Log.d("P2P_Telemetry", "Image sent from gallery as Base64")
+        } catch (e: Exception) {
+            Log.e("P2P_Telemetry", "Error processing URI: ${e.message}")
         }
     }
 }

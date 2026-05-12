@@ -6,14 +6,16 @@ End-to-end setup for running and testing the Android app together with the Sprin
 
 ## 1. Prerequisites
 
-- Android Studio (Iguana or newer recommended)
+- Android Studio
 - JDK 21
 - Android SDK 35 installed via Android Studio
 - A test device — either:
   - Android emulator with **Google Play Services** (FCM does not work on plain AOSP images), or
   - Physical Android device with USB debugging enabled
+  - 
 - Backend repo cloned next to this one: `P2P-shopping/` (Spring Boot, port 8081)
 - Docker Desktop (for MongoDB, PostgreSQL, Redis required by the backend)
+  
 - A Firebase project — for our team it is **`p2p-shopping-fa143`**
 
 ---
@@ -36,7 +38,7 @@ When you first open the project in Android Studio, the `sdk.dir` line is added a
 
 This file is **gitignored** because it contains the Firebase API key. It must be downloaded by each developer from the team's shared Firebase project — **do not create a new Firebase project**. The Android app, the backend FCM service, and the device push tokens all bind to the same Firebase project (`p2p-shopping-fa143`); spinning up your own would mean push notifications sent by the backend never reach your device.
 
-#### One-time, by the Firebase project owner
+#### One-time, by the Firebase project owner (olivia)
 
 Add each new team member as a member of the Firebase project, so they can download the file themselves:
 
@@ -44,8 +46,6 @@ Add each new team member as a member of the Firebase project, so they can downlo
 2. Settings (gear icon, top-left) → **Users and permissions**.
 3. **Add member** → enter the colleague's email → assign role (`Editor` is fine; `Viewer` works too).
 4. They receive an email invite and accept.
-
-(If you cannot add members for some reason, you can send them `app/google-services.json` privately — Slack DM, email — and they skip the download step below. **Never commit it to git or share it in a public channel**, since it exposes the Firebase API key.)
 
 #### Each developer, after being added
 
@@ -175,15 +175,3 @@ If telemetry pings show `200/202` but you never see proximity pings:
 - `app/src/main/res/xml/network_security_config.xml`
 
 ---
-
-## 8. Common failures & fixes
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| Gradle sync: *"File google-services.json is missing"* | step 2.2 skipped | download from Firebase Console |
-| Gradle sync: *"SDK location not found"* | step 2.1 skipped | open the project in Android Studio once, or set `sdk.dir` manually |
-| App crashes on launch with `IllegalStateException: Default FirebaseApp is not initialized` | `google-services.json` is for the wrong package | the file must be for `p2ps.android` |
-| Telemetry pings log `Network error: …` | backend not reachable | check `BASE_URL`, `adb reverse`, firewall |
-| Telemetry pings return `401 Unauthorized` | `API_KEY` missing or wrong | match `local.properties` value with backend `TELEMETRY_API_KEY` |
-| Telemetry pings return `400 Bad Request` on accuracy | location fix with `accuracy=0` | normal foreground service fixes always have accuracy > 0; happens only when the WebView fallback fires. Not blocking for proximity. |
-| FCM notification never arrives | device has no Google Play Services, or `active_list_locations` is empty, or radius too small | check Logcat for `FcmTokenManager` saved, seed Mongo with a test doc near your location |

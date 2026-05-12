@@ -48,6 +48,9 @@ class WebViewActivity : ComponentActivity() {
         private const val KEY_PHOTO_URI = "saved_photo_uri"
         private const val KEY_CALLBACK_ID = "saved_callback_id"
         private const val JS_CALLBACK_NULL = "javascript:window.onNativeImageReceived(null)"
+        private const val IP_LOCALHOST = "127.0.0.1"
+        private const val IP_EMULATOR_HOST = "10.0.2.2"
+        private const val HOST_LOCALHOST = "localhost"
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -183,7 +186,7 @@ class WebViewActivity : ComponentActivity() {
     private fun isExternalUrl(url: String): Boolean {
         val host = Uri.parse(url).host ?: return true
         val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host ?: return true
-        val internalHosts = setOf(authorizedHost, "localhost", "127.0.0.1", "10.0.2.2")
+        val internalHosts = setOf(authorizedHost, HOST_LOCALHOST, IP_LOCALHOST, IP_EMULATOR_HOST)
         return host !in internalHosts
             }
 
@@ -230,7 +233,7 @@ class WebViewActivity : ComponentActivity() {
         if (host == authorizedHost) return true
 
         if (BuildConfig.DEBUG) {
-            val debugHosts = listOf("localhost", "127.0.0.1", "10.0.2.2")
+            val debugHosts = listOf(HOST_LOCALHOST, IP_LOCALHOST, IP_EMULATOR_HOST)
             return debugHosts.contains(host)
         }
 

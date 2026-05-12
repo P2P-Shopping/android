@@ -21,8 +21,16 @@ object ProximityNotificationUtils {
      * Local-development loopback hosts. Only allowed in DEBUG builds so a
      * release APK cannot be tricked into opening a deep link that points at
      * a developer-machine loopback address.
+     *
+     * The IP literals below are intentional and gated by BuildConfig.DEBUG;
+     * Sonar S1313 is suppressed because release builds never see them.
      */
-    private val DEBUG_ONLY_ALLOWED_HOSTS = setOf("localhost", "127.0.0.1", "10.0.2.2")
+    @Suppress("HardcodedIpAddress")
+    private val DEBUG_ONLY_ALLOWED_HOSTS = setOf(
+        "localhost",
+        "127.0.0.1", // NOSONAR S1313 — Android emulator/USB-reverse loopback, DEBUG-only
+        "10.0.2.2"   // NOSONAR S1313 — Android emulator host-machine alias, DEBUG-only
+    )
 
     /**
      * Returns true if a notification should be shown for this FCM message.

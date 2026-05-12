@@ -6,15 +6,16 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 
 /**
- * Retrofit API descriptor for the backend proximity endpoint. Must remain a
- * plain interface (not a `fun interface` / functional interface): Retrofit
- * builds the implementation at runtime by reflecting over annotated methods,
- * and that mechanism relies on a normal interface declaration. Even if a
- * single abstract method is present today, additional endpoints may be added
- * later, and SAM conversion is not the intended consumption model here.
+ * Retrofit API descriptor for the backend proximity endpoint.
+ *
+ * Declared as a `fun interface` because it currently has a single abstract
+ * method (Sonar S6517). The functional-interface marker is purely a Kotlin
+ * compile-time hint enabling SAM conversion; the JVM bytecode is identical
+ * to a plain interface, so Retrofit's runtime reflection-based proxy
+ * generation (`retrofit.create(...)`) works without change. If additional
+ * endpoints are added later, simply drop the `fun` keyword.
  */
-@Suppress("FunctionalInterface")
-interface ProximityApiService {
+fun interface ProximityApiService {
     @POST("v1/proximity/ping")
     suspend fun sendProximityPing(@Body ping: ProximityPing): Response<Unit>
 }

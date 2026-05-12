@@ -1,0 +1,34 @@
+# Copy this file to `local.properties` and fill in the values for your machine.
+# `local.properties` is gitignored because it contains machine-specific paths and secrets.
+
+# --- Android SDK ---
+# Android Studio will auto-generate this line when you first open the project.
+# Example for Windows:
+#   sdk.dir=C\:\\Users\\<YOUR_USER>\\AppData\\Local\\Android\\Sdk
+# Example for macOS:
+#   sdk.dir=/Users/<YOUR_USER>/Library/Android/sdk
+
+# --- Backend API key ---
+# Must match the `TELEMETRY_API_KEY` env var on the Spring Boot server.
+# For local dev the backend defaults to "default-telemetry-key" (see backend application.properties).
+API_KEY=default-telemetry-key
+
+# --- Backend base URL ---
+# Pick ONE of the options below depending on where you run the app:
+#
+#   1) Android Emulator -> host machine:
+#      BASE_URL=http://10.0.2.2:8081/api/
+#
+#   2) Physical device + USB debugging (run `adb reverse tcp:8081 tcp:8081` first):
+#      BASE_URL=http://127.0.0.1:8081/api/
+#
+#   3) Physical device on the same LAN as the dev machine:
+#      BASE_URL=http://<YOUR_LAPTOP_LAN_IP>:8081/api/
+#      Example for the current project lead's machine (172.21.16.1 is a WSL/Hyper-V adapter IP):
+#      BASE_URL=http://172.21.16.1:8081/api/
+#      (also add new IPs to res/xml/network_security_config.xml if they aren't there)
+BASE_URL=http://10.0.2.2:8081/api/
+
+# --- Frontend dashboard URL (loaded in the WebView) ---
+# Use the same convention as BASE_URL above.
+DASHBOARD_URL=http://10.0.2.2:5173

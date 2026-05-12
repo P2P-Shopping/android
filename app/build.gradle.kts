@@ -35,6 +35,12 @@ android {
 
         val dashboardUrl = properties.getProperty("DASHBOARD_URL") ?: "https://p2p-shopping.app"
         buildConfigField("String", "DASHBOARD_URL", "\"$dashboardUrl\"")
+
+        // Default uses 10.0.2.2 so the Android emulator can reach a Spring Boot server
+        // running on the host machine without any extra setup. Physical devices override
+        // this in local.properties (LAN IP or 127.0.0.1 + `adb reverse tcp:8081 tcp:8081`).
+        val baseUrl = properties.getProperty("BASE_URL") ?: "http://10.0.2.2:8081/api/"
+        buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
     }
 
     buildTypes {

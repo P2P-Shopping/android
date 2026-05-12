@@ -13,7 +13,8 @@ class ProximityClient(
 ) {
     companion object {
         private const val TAG = "ProximityClient"
-        private const val BASE_URL = "http://127.0.0.1:8081/api/"
+        // BASE_URL is injected from local.properties via BuildConfig — see app/build.gradle.kts.
+        private val BASE_URL: String = BuildConfig.BASE_URL
 
         private fun buildDefaultApiService(): ProximityApiService {
             val logging = HttpLoggingInterceptor().apply {

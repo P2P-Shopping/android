@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
 
         if (fineGranted) {
             Toast.makeText(this, "Location access granted!", Toast.LENGTH_SHORT).show()
+            requestBackgroundLocationIfNeeded()
             startLocationTrackingService()
             launchWebView()
             if (!notificationsGranted) {
@@ -62,6 +63,29 @@ class MainActivity : ComponentActivity() {
             }
         } else {
             Toast.makeText(this, "Permission denied. Please enable from settings.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // Android 10+ requires ACCESS_BACKGROUND_LOCATION to be requested separately, after FINE is granted.
+    // Android 11+ no longer shows a system dialog — the user must enable "Allow all the time" from settings.
+    private fun requestBackgroundLocationIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return
+        val already = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (already) return
+        backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+    }
+
+    private val backgroundLocationLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Toast.makeText(
+                this,
+                "For background telemetry, enable 'Allow all the time' in app settings.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 

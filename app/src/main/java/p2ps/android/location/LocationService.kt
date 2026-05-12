@@ -33,6 +33,9 @@ import p2ps.android.core.TelemetryDispatcher
 import p2ps.android.data.DeviceIdManager
 import p2ps.android.data.TelemetryManager
 import p2ps.android.data.TelemetryPing
+import p2ps.android.fcm.FcmTokenManager
+import p2ps.android.proximity.ProximityClient
+import p2ps.android.proximity.data.ProximityPing
 import java.util.UUID
 
 class LocationService : Service() {
@@ -44,6 +47,7 @@ class LocationService : Service() {
 
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
+    private val proximityClient = ProximityClient()
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private var currentDeviceId = "unknown"
@@ -139,6 +143,26 @@ class LocationService : Service() {
 
         serviceScope.launch {
             telemetryDispatcher.dispatch(ping)
+        }
+
+        // Also fire a proximity ping so the backend can match nearby active lists
+        // and trigger an FCM notification. Skipped silently if no FCM token is available yet
+        // (e.g. first launch before Firebase finishes registering).
+        val fcmToken = FcmTokenManager.getStoredToken(applicationContext)
+        if (!fcmToken.isNullOrBlank()) {
+            serviceScope.launch {
+                proximityClient.sendPing(
+                    ProximityPing(
+                        deviceId = currentDeviceId,
+                        lat = location.latitude,
+                        lng = location.longitude,
+                        timestamp = System.currentTimeMillis(),
+                        fcmToken = fcmToken
+                    )
+                )
+            }
+        } else {
+            Log.d("TelemetryService", "Skipping proximity ping — FCM token not yet available")
         }
     }
 

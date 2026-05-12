@@ -20,7 +20,7 @@ object PermissionDecider {
      * On API < 33, notifications are always granted (no runtime permission needed).
      */
     fun isNotificationsGranted(sdkInt: Int, permissionGranted: Boolean): Boolean =
-        if (sdkInt >= 33) permissionGranted else true
+        sdkInt < 33 || permissionGranted
 
     /**
      * Returns true if the location tracking service should be started.

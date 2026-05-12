@@ -16,38 +16,15 @@ import p2ps.android.WebViewActivity
 
 class P2PJsBridge(private val context: Context) {
 
-    companion object {
-        private const val PREFS_NAME = "p2ps_device_prefs"
-        private const val KEY_DEVICE_ID = "device_id"
-        const val CAMERA_REQ_CODE = 101
-        var lastCallbackId: String? = null
-        const val PICK_IMAGE_REQ_CODE = 201
-        var photoUri: android.net.Uri? = null
-    }
+
 
     @JavascriptInterface
     fun getDeviceId(): String {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-        // Return cached ID if already stored
-        prefs.getString(KEY_DEVICE_ID, null)?.let { return it }
-
-        // Resolve ANDROID_ID
-        val androidId = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ANDROID_ID
-        )
-
-        // Use ANDROID_ID if valid, otherwise generate a UUID
-        val deviceId = if (!androidId.isNullOrBlank() && androidId != "9774d56d682e549c") {
-            androidId
-        } else {
-            UUID.randomUUID().toString()
-        }
-
-        // Persist so it survives across restarts
-        prefs.edit { putString(KEY_DEVICE_ID, deviceId) }
-
+        val prefs = context.getSharedPreferences("p2ps_device_prefs", Context.MODE_PRIVATE)
+        prefs.getString("device_id", null)?.let { return it }
+        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        val deviceId = if (!androidId.isNullOrBlank() && androidId != "9774d56d682e549c") androidId else UUID.randomUUID().toString()
+        prefs.edit { putString("device_id", deviceId) }
         return deviceId
     }
 
@@ -58,7 +35,8 @@ class P2PJsBridge(private val context: Context) {
     @JavascriptInterface
     fun openNativeCamera(callbackId: Any?) {
         val webActivity = context as? WebViewActivity ?: return
-        lastCallbackId = callbackId.toString()
+        val idString = callbackId?.toString()
+
         webActivity.runOnUiThread {
 
             val hasCameraPermission = ContextCompat.checkSelfPermission(
@@ -67,17 +45,16 @@ class P2PJsBridge(private val context: Context) {
             ) == PackageManager.PERMISSION_GRANTED
 
             if (hasCameraPermission) {
-                Log.d("P2PBridge", "Permission already exists. Starting camera...")
-                dispatchCameraIntent()
+                dispatchCameraIntent(idString)
             } else {
-                Log.d("P2PBridge", "No permission. Please give permission...")
+                webActivity.setPendingTransaction(idString, null)
                 webActivity.requestCameraPermissions(arrayOf(Manifest.permission.CAMERA))
             }
         }
     }
 
 
-    private fun dispatchCameraIntent() {
+    private fun dispatchCameraIntent(callbackId: String?) {
         val activity = context as? WebViewActivity ?: return
         activity.runOnUiThread {
             try {
@@ -93,7 +70,7 @@ class P2PJsBridge(private val context: Context) {
                     "p2ps.android.fileprovider",
                     photoFile
                 )
-                photoUri = uri
+                activity.setPendingTransaction(callbackId, uri)
 
                 val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
                     putExtra(MediaStore.EXTRA_OUTPUT, uri)

@@ -41,8 +41,26 @@ class WebViewActivity : ComponentActivity() {
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var progressBar: ProgressBar
 
+    private var currentPhotoUri: Uri? = null
+    private var currentCallbackId: String? = null
+
+    companion object {
+        private const val KEY_PHOTO_URI = "saved_photo_uri"
+        private const val KEY_CALLBACK_ID = "saved_callback_id"
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putParcelable(KEY_PHOTO_URI, currentPhotoUri)
+        outState.putString(KEY_CALLBACK_ID, currentCallbackId)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            currentPhotoUri = savedInstanceState.getParcelable(KEY_PHOTO_URI)
+            currentCallbackId = savedInstanceState.getString(KEY_CALLBACK_ID)
+        }
 
         setupComponents()
         setupLaunchers()
@@ -50,6 +68,10 @@ class WebViewActivity : ComponentActivity() {
         setupNavigationHandling()
 
         webView.loadUrl(BuildConfig.DASHBOARD_URL)
+    }
+    fun setPendingTransaction(callbackId: String?, uri: Uri?) {
+        this.currentCallbackId = callbackId
+        this.currentPhotoUri = uri
     }
 
     private fun setupComponents() {
@@ -78,23 +100,19 @@ class WebViewActivity : ComponentActivity() {
     private fun setupLaunchers() {
         cameraGalleryLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
-                val dataUri: Uri? = result.data?.data ?: P2PJsBridge.photoUri
+                val dataUri: Uri? = result.data?.data ?: currentPhotoUri
                 handleCaptureResult(dataUri, result.data)
             } else {
                 handleCaptureResult(null, result.data)
-                webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)
-            }
+                webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)            }
         }
 
         permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
-
-            val currentCallbackId = P2PJsBridge.lastCallbackId
-
             if (cameraGranted) {
                 jsBridge.openNativeCamera(currentCallbackId)
             } else {
-                webView.evaluateJavascript("javascript:onNativeUploadError('$currentCallbackId', 'Permission Denied')", null)
+                webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)
                 Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show()
             }
         }
@@ -105,12 +123,16 @@ class WebViewActivity : ComponentActivity() {
             processAndSendImage(dataUri)
         } else {
             val bitmap = intentData?.extras?.get("data") as? android.graphics.Bitmap
-            bitmap?.let {
+            if (bitmap != null) {
                 val outputStream = java.io.ByteArrayOutputStream()
-                it.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, outputStream)
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, outputStream)
                 val base64String = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
                 webView.post {
                     webView.evaluateJavascript("javascript:window.onNativeImageReceived('$base64String')", null)
+                }
+            } else {
+                webView.post {
+                    webView.evaluateJavascript("javascript:window.onNativeImageReceived(null)", null)
                 }
             }
         }
@@ -124,8 +146,8 @@ class WebViewActivity : ComponentActivity() {
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             mixedContentMode = if (BuildConfig.DEBUG) WebSettings.MIXED_CONTENT_ALWAYS_ALLOW else WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            allowFileAccess = true
-            allowContentAccess = true
+            allowFileAccess = false
+            allowContentAccess = false
         }
 
         webView.webChromeClient = object : WebChromeClient() {
@@ -134,7 +156,6 @@ class WebViewActivity : ComponentActivity() {
                 return true
             }
         }
-        webView.settings.allowFileAccess = true
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -159,10 +180,11 @@ class WebViewActivity : ComponentActivity() {
     }
 
     private fun isExternalUrl(url: String): Boolean {
+        val host = Uri.parse(url).host ?: return true
         val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host ?: return true
-        val internalHosts = listOf(authorizedHost, "localhost", "127.0.0.1", "10.0.2.2")
-        return internalHosts.none { url.contains(it) }
-    }
+        val internalHosts = setOf(authorizedHost, "localhost", "127.0.0.1", "10.0.2.2")
+        return host !in internalHosts
+            }
 
     private fun setupNavigationHandling() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -197,19 +219,21 @@ class WebViewActivity : ComponentActivity() {
         """.trimIndent()
         view?.evaluateJavascript(js, null)
     }
-    /*fun isAuthorized(): Boolean {
-        val url = webView.url ?: return false
-        val host = Uri.parse(url).host ?: return false
-        val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host
-        return host == authorizedHost || host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2"
-    }*/
     fun isAuthorized(): Boolean {
         val url = webView.url ?: return false
         if (url.startsWith("file:///android_asset/")) return true
 
         val host = Uri.parse(url).host ?: return false
+
         val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host
-        return host == authorizedHost || host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2"
+        if (host == authorizedHost) return true
+
+        if (BuildConfig.DEBUG) {
+            val debugHosts = listOf("localhost", "127.0.0.1", "10.0.2.2")
+            return debugHosts.contains(host)
+        }
+
+        return false
     }
 
     inner class WebAppInterface {

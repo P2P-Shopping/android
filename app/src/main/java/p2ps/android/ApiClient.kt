@@ -14,8 +14,8 @@ import p2ps.android.BuildConfig
 class ApiClient(context: Context) {
     companion object {
         private const val TAG = "ApiClient"
-        // Folosim 127.0.0.1 pentru ADB Reverse prin USB
-        private const val BASE_URL = "http://127.0.0.1:8081/api/"
+        // BASE_URL is injected from local.properties via BuildConfig — see app/build.gradle.kts.
+        private val BASE_URL: String = BuildConfig.BASE_URL
     }
 
     private val apiService: ApiService

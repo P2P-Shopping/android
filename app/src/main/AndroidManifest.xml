@@ -3,6 +3,17 @@
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--
+        ACCESS_BACKGROUND_LOCATION is required by the proximity-alert feature (Task #253):
+        the foreground LocationService must continue to receive GPS updates after the user
+        navigates away from the app, so the backend can match the user's position against
+        active shopping list items and trigger an FCM push. The user is informed via the
+        persistent foreground-service notification while location sampling is active, and
+        the runtime prompt explicitly asks them to choose "Allow all the time". No location
+        data is shared with third parties — it is only sent to our own /api/v1/proximity/ping
+        endpoint over the network-security-config-restricted channel.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -50,18 +61,17 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="p2ps.android.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PATHS"
-                android:resource="@xml/file_paths" />
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+        <service
+                android:name=".fcm.ProximityMessagingService"
+                android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+                android:name="com.google.firebase.messaging.default_notification_channel_id"
+                android:value="proximity_alerts" />
     </application>
 
 </manifest>

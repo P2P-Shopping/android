@@ -199,6 +199,32 @@ class WebViewActivity : ComponentActivity() {
                 }
             }
         })
+
+
+        // Check if launched from a proximity notification with a deep link
+        val deepLink = intent?.getStringExtra("deepLink")
+        val urlToLoad = deepLink ?: BuildConfig.DASHBOARD_URL
+        webView.loadUrl(urlToLoad)
+    }
+
+    override fun onResume() { super.onResume(); webView.onResume() }
+    override fun onPause() { super.onPause(); webView.onPause() }
+    override fun onDestroy() {
+        webView.apply {
+            removeJavascriptInterface("AndroidInterface")
+            stopLoading()
+            loadUrl("about:blank")
+            destroy()
+        }
+        super.onDestroy()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val deepLink = intent.getStringExtra("deepLink")
+        if (!deepLink.isNullOrBlank()) {
+            webView.loadUrl(deepLink)
+        }
     }
 
     private fun injectAutoPingScript(view: WebView?) {

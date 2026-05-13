@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.sonarqube)
     alias(libs.plugins.jacoco)
+    alias(libs.plugins.google.services)
+
 }
 
 android {
@@ -33,6 +35,12 @@ android {
 
         val dashboardUrl = properties.getProperty("DASHBOARD_URL") ?: "https://p2p-shopping.app"
         buildConfigField("String", "DASHBOARD_URL", "\"$dashboardUrl\"")
+
+        // Default uses 10.0.2.2 so the Android emulator can reach a Spring Boot server
+        // running on the host machine without any extra setup. Physical devices override
+        // this in local.properties (LAN IP or 127.0.0.1 + `adb reverse tcp:8081 tcp:8081`).
+        val baseUrl = properties.getProperty("BASE_URL") ?: "http://10.0.2.2:8081/api/"
+        buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
     }
 
     buildTypes {
@@ -69,6 +77,8 @@ jacoco {
 }
 
 dependencies {
+
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -94,16 +104,17 @@ dependencies {
 
     // Testare
     testImplementation(libs.junit)
-    testImplementation("io.mockk:mockk:1.13.5")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("io.mockk:mockk:1.13.13")
 
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.webkit:webkit:1.11.0")
-    implementation("androidx.exifinterface:exifinterface:1.3.7")
-    // Dependențe pentru Unit Testing (directorul 'test')
-    testImplementation("org.robolectric:robolectric:4.11.1")
-    testImplementation("androidx.test:core-ktx:1.5.0")
+
+     // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 }
 
 tasks.withType<Test> {
@@ -112,3 +123,4 @@ tasks.withType<Test> {
         excludes = listOf("jdk.internal.*")
     }
 }
+

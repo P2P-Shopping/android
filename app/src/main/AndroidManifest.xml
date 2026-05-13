@@ -21,6 +21,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="false"
@@ -30,9 +37,7 @@
         android:theme="@style/Theme.P2psandroid"
         android:usesCleartextTraffic="false">
 
-        <!-- Noul WebViewer pentru JS Bridge (din PR-ul tău) -->
-        <activity android:name=".P2PWebViewActivity" />
-
+        <!-- MainActivity: Ecranul de start -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -43,12 +48,12 @@
             </intent-filter>
         </activity>
 
-        <!-- WebViewer-ul existent pe main -->
+        <!-- WebViewActivity: AICI am combinat totul într-un singur tag -->
         <activity
             android:name=".WebViewActivity"
             android:exported="false"
             android:theme="@style/Theme.P2psandroid"
-            android:configChanges="orientation|screenSize" />
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <service
             android:name=".location.LocationService"

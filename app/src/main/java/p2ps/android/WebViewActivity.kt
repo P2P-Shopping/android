@@ -23,24 +23,73 @@ import p2ps.android.data.DeviceIdManager
 import p2ps.android.data.TelemetryPing
 import java.util.UUID
 import org.json.JSONObject
-
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
+import android.content.pm.PackageManager
+import android.Manifest
+import android.util.Base64
+import java.io.InputStream
+import kotlinx.coroutines.Dispatchers
 class WebViewActivity : ComponentActivity() {
 
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var webView: WebView
+    private lateinit var jsBridge: P2PJsBridge
+    private lateinit var cameraGalleryLauncher: ActivityResultLauncher<Intent>
+
+    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+    private lateinit var progressBar: ProgressBar
+
+    private var currentPhotoUri: Uri? = null
+    private var currentCallbackId: String? = null
+
+    companion object {
+        private const val KEY_PHOTO_URI = "saved_photo_uri"
+        private const val KEY_CALLBACK_ID = "saved_callback_id"
+        private const val JS_CALLBACK_NULL = "javascript:window.onNativeImageReceived(null)"
+        private const val IP_LOCALHOST = "127.0.0.1" // NOSONAR
+        private const val IP_EMULATOR_HOST = "10.0.2.2" // NOSONAR
+        private const val HOST_LOCALHOST = "localhost"
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putParcelable(KEY_PHOTO_URI, currentPhotoUri)
+        outState.putString(KEY_CALLBACK_ID, currentCallbackId)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            currentPhotoUri = savedInstanceState.getParcelable(KEY_PHOTO_URI)
+            currentCallbackId = savedInstanceState.getString(KEY_CALLBACK_ID)
+        }
 
+        setupComponents()
+        setupLaunchers()
+        setupWebViewConfiguration()
+        setupNavigationHandling()
+
+        webView.loadUrl(BuildConfig.DASHBOARD_URL)
+    }
+    fun setPendingTransaction(callbackId: String?, uri: Uri?) {
+        this.currentCallbackId = callbackId
+        this.currentPhotoUri = uri
+    }
+
+    private fun setupComponents() {
         val database = AppDatabase.getDatabase(this)
         telemetryDispatcher = TelemetryDispatcher(database.telemetryDao(), this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
-
         webView = WebView(this)
-        val progressBar = ProgressBar(this).apply {
+        jsBridge = P2PJsBridge(this)
+
+        webView.addJavascriptInterface(jsBridge, "P2PBridge")
+        webView.addJavascriptInterface(WebAppInterface(), "AndroidInterface")
+
+        progressBar = ProgressBar(this).apply {
             visibility = View.VISIBLE
         }
 
@@ -49,20 +98,61 @@ class WebViewActivity : ComponentActivity() {
         rootLayout.addView(progressBar, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.CENTER))
         setContentView(rootLayout)
 
+        this.intent.putExtra("pb_ref", progressBar.id)
+    }
+
+    private fun setupLaunchers() {
+        cameraGalleryLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val dataUri: Uri? = result.data?.data ?: currentPhotoUri
+                handleCaptureResult(dataUri, result.data)
+            } else {
+                handleCaptureResult(null, result.data)
+                webView.evaluateJavascript(JS_CALLBACK_NULL, null)            }
+        }
+
+        permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
+            if (cameraGranted) {
+                jsBridge.openNativeCamera(currentCallbackId)
+            } else {
+                webView.evaluateJavascript(JS_CALLBACK_NULL, null)
+                Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun handleCaptureResult(dataUri: Uri?, intentData: Intent?) {
+        if (dataUri != null) {
+            processAndSendImage(dataUri)
+        } else {
+            val bitmap = intentData?.extras?.get("data") as? android.graphics.Bitmap
+            if (bitmap != null) {
+                val outputStream = java.io.ByteArrayOutputStream()
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, outputStream)
+                val base64String = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                webView.post {
+                    webView.evaluateJavascript("javascript:window.onNativeImageReceived('$base64String')", null)
+                }
+            } else {
+                webView.post {
+                    webView.evaluateJavascript(JS_CALLBACK_NULL, null)
+                }
+            }
+        }
+    }
+
+    private fun setupWebViewConfiguration() {
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            databaseEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
-            mixedContentMode = if (BuildConfig.DEBUG) {
-                WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            } else {
-                WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            }
+            mixedContentMode = if (BuildConfig.DEBUG) WebSettings.MIXED_CONTENT_ALWAYS_ALLOW else WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            allowFileAccess = false
+            allowContentAccess = false
         }
-
-        // Folosim interfața clasică dar cu securitate sporită și stabilitate asincronă
-        webView.addJavascriptInterface(WebAppInterface(), "AndroidInterface")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(message: ConsoleMessage?): Boolean {
@@ -74,15 +164,15 @@ class WebViewActivity : ComponentActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                progressBar.visibility = View.GONE
+                if (::progressBar.isInitialized) {
+                    progressBar.visibility = View.GONE
+                }
                 injectAutoPingScript(view)
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
-                val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host
-                if (authorizedHost != null && !url.contains(authorizedHost) && 
-                    !url.contains("localhost") && !url.contains("127.0.0.1") && !url.contains("10.0.2.2")) {
+                if (isExternalUrl(url)) {
                     try {
                         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         return true
@@ -91,7 +181,16 @@ class WebViewActivity : ComponentActivity() {
                 return false
             }
         }
+    }
 
+    private fun isExternalUrl(url: String): Boolean {
+        val host = Uri.parse(url).host ?: return true
+        val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host ?: return true
+        val internalHosts = setOf(authorizedHost, HOST_LOCALHOST, IP_LOCALHOST, IP_EMULATOR_HOST)
+        return host !in internalHosts
+            }
+
+    private fun setupNavigationHandling() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (webView.canGoBack()) webView.goBack() else {
@@ -150,11 +249,26 @@ class WebViewActivity : ComponentActivity() {
         """.trimIndent()
         view?.evaluateJavascript(js, null)
     }
+    fun isAuthorized(): Boolean {
+        val url = webView.url ?: return false
+        if (url.startsWith("file:///android_asset/")) return true
+
+        val host = Uri.parse(url).host ?: return false
+
+        val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host
+        if (host == authorizedHost) return true
+
+        if (BuildConfig.DEBUG) {
+            val debugHosts = listOf(HOST_LOCALHOST, IP_LOCALHOST, IP_EMULATOR_HOST)
+            return debugHosts.contains(host)
+        }
+
+        return false
+    }
 
     inner class WebAppInterface {
         @JavascriptInterface
         fun postTelemetry(storeId: String, itemId: String, triggerType: String) {
-            // Validarea originii se face acum pe thread-ul principal pentru siguranță
             runOnUiThread {
                 if (isAuthorized()) {
                     sendPing(storeId, itemId, triggerType)
@@ -167,13 +281,6 @@ class WebViewActivity : ComponentActivity() {
 
         @JavascriptInterface
         fun getPlatform(): String = "android"
-
-        private fun isAuthorized(): Boolean {
-            val url = webView.url ?: return false
-            val host = Uri.parse(url).host ?: return false
-            val authorizedHost = Uri.parse(BuildConfig.DASHBOARD_URL).host
-            return host == authorizedHost || host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2"
-        }
     }
 
     private fun sendPing(storeId: String, itemId: String, triggerType: String) {
@@ -226,4 +333,57 @@ class WebViewActivity : ComponentActivity() {
             Log.i("WebViewActivity", "SUCCESS: Telemetry saved for $itemId")
         }
     }
+    private fun processAndSendImage(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val inputStream = contentResolver.openInputStream(uri)
+                val bytes = inputStream?.use { it.readBytes() }
+
+                if (bytes != null) {
+                    val base64String = Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        webView.evaluateJavascript("javascript:window.onNativeImageReceived('$base64String')", null)
+                    }
+                    Log.d("P2P_Telemetry", "Image sent successfully")
+                } else {
+                    throw Exception("Failed to read bytes from URI")
+                }
+            } catch (e: Exception) {
+                Log.e("P2P_Telemetry", "Error processing URI: ${e.message}")
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    webView.evaluateJavascript(JS_CALLBACK_NULL, null)
+                }
+            }
+        }
+    }
+    fun launchNativePicker(intent: Intent) {
+        cameraGalleryLauncher.launch(intent)
+    }
+
+    fun requestCameraPermissions(permissions: Array<String>) {
+        permissionLauncher.launch(permissions)
+    }
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        webView.onPause()
+    }
+
+    override fun onDestroy() {
+        webView.removeJavascriptInterface("P2PBridge")
+        webView.removeJavascriptInterface("AndroidInterface")
+
+        webView.stopLoading()
+        webView.loadUrl("about:blank")
+        webView.destroy()
+
+        super.onDestroy()
+    }
+
 }

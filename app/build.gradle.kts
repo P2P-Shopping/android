@@ -104,6 +104,8 @@ dependencies {
     // Dependențe pentru Unit Testing (directorul 'test')
     testImplementation("org.robolectric:robolectric:4.11.1")
     testImplementation("androidx.test:core-ktx:1.5.0")
+    testImplementation("org.mockito:mockito-core:5.11.0")
+    testImplementation("org.robolectric:robolectric:4.11.1")
 }
 
 tasks.withType<Test> {

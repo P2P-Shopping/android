@@ -32,12 +32,26 @@ import p2ps.android.data.TelemetryPing
 import p2ps.android.ui.theme.P2PSAndroidTheme
 import java.util.UUID
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.runtime.mutableStateOf
+import androidx.core.app.ActivityCompat
+import p2ps.android.ui.theme.ProximityPermissionRationaleDialog
+
+private val components: Any
+    get() {
+        TODO()
+    }
 
 class MainActivity : ComponentActivity() {
     private lateinit var telemetryManager: TelemetryManager
     private lateinit var telemetryDispatcher: TelemetryDispatcher
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var hardwareManager: HardwareManager
+    // Stări Compose pentru afișarea dialogurilor
+    private var showRationaleDialog = mutableStateOf(false)
+    private var showSettingsDialog = mutableStateOf(false)
+    private var pendingPermissionsToRequest = arrayOf<String>()
 
     companion object {
         private const val DEFAULT_STORE_ID = "Lidl_01"
@@ -49,7 +63,7 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION]
             ?: (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
-        
+
         val notificationsGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             permissions[Manifest.permission.POST_NOTIFICATIONS]
                 ?: (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
@@ -63,7 +77,15 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this, "Notifications disabled. Service will run silently.", Toast.LENGTH_LONG).show()
             }
         } else {
-            Toast.makeText(this, "Permission denied. Please enable from settings.", Toast.LENGTH_LONG).show()
+            // Verificăm dacă a dat "Don't ask again" (Permanently denied)
+            val permanentlyDenied = !ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)
+
+            if (permanentlyDenied) {
+                showSettingsDialog.value = true // Afișăm dialogul care duce la Setări
+            } else {
+                Toast.makeText(this, "Aplicația va rula fără telemetrie de proximitate.", Toast.LENGTH_SHORT).show()
+                launchWebView() // Lăsăm aplicația să continue normal
+            }
         }
     }
 
@@ -84,11 +106,53 @@ class MainActivity : ComponentActivity() {
             P2PSAndroidTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     WelcomeScreen(
-                        onTriggerClick = {
-                            simulateHardwareTrigger()
-                        },
+                        onTriggerClick = { simulateHardwareTrigger() },
                         modifier = Modifier.padding(innerPadding)
                     )
+
+                    // 1. Dialogul Rationale (înainte de a cere permisiunea de la sistem)
+                    if (showRationaleDialog.value) {
+                        ProximityPermissionRationaleDialog(
+                            onContinueClick = {
+                                showRationaleDialog.value = false
+                                requestPermissionLauncher.launch(pendingPermissionsToRequest)
+                            },
+                            onDismissClick = {
+                                showRationaleDialog.value = false
+                                Toast.makeText(this@MainActivity, "Telemetrie dezactivată.", Toast.LENGTH_SHORT).show()
+                                launchWebView()
+                            }
+                        )
+                    }
+
+                    // 2. Dialogul pentru cazul "Permanently Denied"
+                    if (showSettingsDialog.value) {
+                        AlertDialog(
+                            onDismissRequest = {
+                                showSettingsDialog.value = false
+                                launchWebView()
+                            },
+                            title = { Text("Permisiune necesară") },
+                            text = { Text("Ai refuzat accesul la locație. Pentru a folosi funcția de proximitate, trebuie să o activezi manual din setările aplicației.") },
+                            confirmButton = {
+                                Button(onClick = {
+                                    showSettingsDialog.value = false
+                                    openAppSettings()
+                                    launchWebView()
+                                }) {
+                                    Text("Mergi la Setări")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    showSettingsDialog.value = false
+                                    launchWebView()
+                                }) {
+                                    Text("Anulează")
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -120,13 +184,22 @@ class MainActivity : ComponentActivity() {
         val missing = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        
+
         if (missing.isEmpty()) {
             startLocationTrackingService()
             launchWebView()
         } else {
-            requestPermissionLauncher.launch(missing.toTypedArray())
+            // AICI E MODIFICAREA: Nu cerem direct la OS, ci afișăm dialogul nostru mai întâi
+            pendingPermissionsToRequest = missing.toTypedArray()
+            showRationaleDialog.value = true
         }
+    }
+
+    private fun openAppSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        startActivity(intent)
     }
 
     @SuppressLint("MissingPermission")

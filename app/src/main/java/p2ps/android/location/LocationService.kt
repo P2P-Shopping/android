@@ -79,7 +79,7 @@ class LocationService : Service() {
         createNotificationChannel()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
+        p2ps.android.core.createProximityNotificationChannel(this)
         accelerometer?.let {
             sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
@@ -140,6 +140,7 @@ class LocationService : Service() {
         serviceScope.launch {
             telemetryDispatcher.dispatch(ping)
         }
+        showProximityAlertNotification()
     }
 
     private fun createNotification(): android.app.Notification {
@@ -260,5 +261,55 @@ class LocationService : Service() {
         super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallback)
         sensorManager.unregisterListener(sensorListener)
+    }
+    private fun showProximityAlertNotification() {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        // Folosim un ID diferit față de NOTIFICATION_ID (care e 12345 pentru serviciu)
+        val proximityNotificationId = 1001
+
+        // Aici va trebui să folosim datele reale (momentan folosim currentItemId pe care îl ai deja salvat)
+        val itemName = "Item ID: $currentItemId"
+        val itemDeepLink = "https://domeniul-tau.ro/item/$currentItemId" // Adaptează link-ul
+
+        // --- Acțiunea 1: Butonul "View" ---
+        // NOTĂ: Asigură-te că P2PWebViewActivity este importată corect!
+        val viewIntent = Intent(this, p2ps.android.P2PWebViewActivity::class.java).apply {
+            putExtra("URL_EXTRA", itemDeepLink)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val viewPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            viewIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // --- Acțiunea 2: Butonul "Dismiss" ---
+        val dismissIntent = Intent(this, NotificationDismissReceiver::class.java).apply {
+            putExtra("NOTIFICATION_ID", proximityNotificationId)
+        }
+        val dismissPendingIntent = PendingIntent.getBroadcast(
+            this,
+            1,
+            dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // --- Construcția notificării ---
+        val notification = NotificationCompat.Builder(this, "proximity_alerts") // Folosim canalul nou creat de tine
+            .setSmallIcon(R.drawable.ic_proximity_alert)
+            .setContentTitle(itemName)
+            .setContentText("Ești în apropierea acestui item!")
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText("Te afli în apropierea itemului '$itemName'. Apasă View pentru a vedea detaliile în aplicație.")
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .addAction(0, "View", viewPendingIntent)
+            .addAction(0, "Dismiss", dismissPendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        // Afișăm notificarea de proximitate
+        notificationManager.notify(proximityNotificationId, notification)
     }
 }
